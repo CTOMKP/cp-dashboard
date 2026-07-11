@@ -19,8 +19,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="bg-[#0A0A0A]">
-      <body className={`${inter.variable} bg-[#0A0A0A] text-white antialiased`}>{children}</body>
+    <html lang="en" className="dark" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem("ctom-creator-theme");document.documentElement.classList.remove("dark","light");document.documentElement.classList.add(t==="light"?"light":"dark");}catch(e){document.documentElement.classList.add("dark");}})();`,
+          }}
+        />
+      </head>
+      <body className={`${inter.variable} antialiased`}>{children}</body>
     </html>
   );
 }
