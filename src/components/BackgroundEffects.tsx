@@ -220,7 +220,7 @@ export function FlowLines() {
   );
 }
 
-export function MarqueeTicker() {
+export function MarqueeTicker({ className = "" }: { className?: string }) {
   const items = [
     "USDC PAYOUTS",
     "6% PLATFORM FEE",
@@ -232,7 +232,10 @@ export function MarqueeTicker() {
   ];
 
   return (
-    <div className="ticker-wrap pointer-events-none absolute inset-x-0 top-8 z-[8] overflow-hidden" aria-hidden>
+    <div
+      className={`ticker-wrap overflow-hidden ${className}`}
+      aria-hidden
+    >
       <div className="ticker-track">
         {[...items, ...items].map((item, i) => (
           <span key={i} className="ticker-item">

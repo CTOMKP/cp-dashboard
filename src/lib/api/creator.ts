@@ -171,4 +171,13 @@ export function resetPassword(data: {
   });
 }
 
+export function deactivateAccount(
+  username: string
+): Promise<{ success: boolean }> {
+  return fetchApi<{ success: boolean }>("/api/creator/settings/deactivate", {
+    method: "POST",
+    body: JSON.stringify({ username }),
+  });
+}
+
 export { ApiError };

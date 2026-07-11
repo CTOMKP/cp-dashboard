@@ -9,7 +9,7 @@ export default function CTAButton({
 }) {
   return (
     <Link
-      href="/creator-signup"
+      href="/creator/signup"
       className={`cta-glow cta-gradient inline-flex items-center justify-center rounded-xl px-8 py-4 text-base font-bold ${className}`}
     >
       {children}

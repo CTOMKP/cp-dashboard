@@ -1,5 +1,6 @@
 import CTAButton from "./CTAButton";
 import FadeInSection from "./FadeInSection";
+import LandingAuthBar from "./LandingAuthBar";
 import {
   AuroraOrbs,
   CryptoNetwork,
@@ -27,7 +28,17 @@ export default function Hero() {
       <ScanLine />
       <div className="noise-overlay absolute inset-0" />
       <div className="hero-vignette absolute inset-0" />
-      <MarqueeTicker />
+
+      <div className="absolute inset-x-0 top-0 z-20 px-4 pt-4 sm:px-6 sm:pt-6">
+        <div className="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
+          <div className="min-w-0 flex-1 overflow-hidden pt-1 sm:pt-0">
+            <MarqueeTicker />
+          </div>
+          <div className="shrink-0 self-end sm:self-auto">
+            <LandingAuthBar />
+          </div>
+        </div>
+      </div>
 
       <div className="relative z-10 mx-auto max-w-3xl text-center">
         <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#222222] bg-[#111111]/80 px-4 py-2 text-xs font-semibold tracking-wider text-[#888888] backdrop-blur-sm">

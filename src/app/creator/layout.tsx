@@ -18,12 +18,20 @@ const pageTitles: Record<string, string> = {
   "/creator/settings": "Settings",
 };
 
+const AUTH_ROUTES = ["/creator/signup", "/creator/login"];
+
 export default function CreatorLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const isAuthRoute = AUTH_ROUTES.includes(pathname);
+
+  if (isAuthRoute) {
+    return <>{children}</>;
+  }
+
   const title = pageTitles[pathname] ?? "Creator Dashboard";
 
   return (

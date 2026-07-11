@@ -111,6 +111,8 @@ export interface CreatorSettingsData {
   email: string;
   profileImageUrl?: string;
   usernameLocked?: boolean;
+  accountDeactivated?: boolean;
+  deactivatedAt?: string;
   walletChange?: WalletChangeState;
   wallets: {
     chain: PayoutChainId;

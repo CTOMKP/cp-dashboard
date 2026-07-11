@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   BarChart3,
   Home,
+  LogOut,
   Megaphone,
   Settings,
   Users,
@@ -13,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { useSidebar } from "@/contexts/SidebarContext";
+import { signOut } from "@/lib/auth";
 
 const navItems = [
   { href: "/creator", label: "Overview", icon: Home, exact: true },
@@ -85,6 +87,20 @@ export default function Sidebar() {
             );
           })}
         </nav>
+
+        <div className="border-t border-creator-border p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <button
+            type="button"
+            onClick={() => {
+              closeSidebar();
+              void signOut();
+            }}
+            className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm text-creator-text-secondary transition-colors hover:bg-creator-accent-muted hover:text-creator-text-primary"
+          >
+            <LogOut className="h-5 w-5 shrink-0 md:h-4 md:w-4" />
+            <span>Sign Out</span>
+          </button>
+        </div>
       </aside>
     </>
   );

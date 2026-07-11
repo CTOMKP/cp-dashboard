@@ -77,3 +77,26 @@ export function syncSettingsWallet(address: string) {
     });
   }
 }
+
+export function deactivateAccount(
+  username: string
+): { success: boolean; error?: string } {
+  if (settingsState.accountDeactivated) {
+    return { success: false, error: "This account is already deactivated." };
+  }
+
+  if (username.trim() !== settingsState.username) {
+    return {
+      success: false,
+      error: "Username does not match your account.",
+    };
+  }
+
+  commitSettingsState({
+    ...settingsState,
+    accountDeactivated: true,
+    deactivatedAt: new Date().toISOString(),
+  });
+
+  return { success: true };
+}

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import RouteThemeGuard from "@/components/RouteThemeGuard";
 import "./globals.css";
 
 const inter = Inter({
@@ -23,11 +24,14 @@ export default function RootLayout({
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem("ctom-creator-theme");document.documentElement.classList.remove("dark","light");document.documentElement.classList.add(t==="light"?"light":"dark");}catch(e){document.documentElement.classList.add("dark");}})();`,
+            __html: `(function(){try{var p=location.pathname;var forceDark=p==="/"||p==="/login"||p==="/creator/signup"||p==="/creator/login"||p==="/creator-signup";if(forceDark){document.documentElement.classList.remove("light");document.documentElement.classList.add("dark");return;}var t=localStorage.getItem("ctom-creator-theme");document.documentElement.classList.remove("dark","light");document.documentElement.classList.add(t==="light"?"light":"dark");}catch(e){document.documentElement.classList.add("dark");}})();`,
           }}
         />
       </head>
-      <body className={`${inter.variable} antialiased`}>{children}</body>
+      <body className={`${inter.variable} bg-[#0A0A0A] text-white antialiased`}>
+        <RouteThemeGuard />
+        {children}
+      </body>
     </html>
   );
 }

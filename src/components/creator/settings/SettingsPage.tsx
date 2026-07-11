@@ -10,14 +10,17 @@ import {
   Lock,
   Save,
   User,
+  UserX,
   Wallet,
 } from "lucide-react";
 import {
+  deactivateAccount as deactivateAccountApi,
   getSettings,
   resetPassword,
   updateSettings,
   updateWalletAddress,
 } from "@/lib/api/creator";
+import { signOut } from "@/lib/auth";
 import { useCreatorProfile } from "@/contexts/CreatorProfileContext";
 import { maskEmail, truncateWallet, formatDate } from "@/lib/format";
 import {
@@ -33,6 +36,7 @@ import type { CreatorSettingsData } from "@/types/creator";
 import ErrorState from "@/components/creator/ui/ErrorState";
 import Badge from "@/components/creator/ui/Badge";
 import { Skeleton } from "@/components/creator/ui/Skeleton";
+import DeactivateAccountModal from "@/components/creator/settings/DeactivateAccountModal";
 
 export default function SettingsPage() {
   const { profile, updateProfile, refreshProfile } = useCreatorProfile();
@@ -54,6 +58,10 @@ export default function SettingsPage() {
   const [savingWallet, setSavingWallet] = useState(false);
   const [walletError, setWalletError] = useState<string | null>(null);
   const [countdown, setCountdown] = useState("");
+  const [deactivateModalOpen, setDeactivateModalOpen] = useState(false);
+  const [deactivateUsername, setDeactivateUsername] = useState("");
+  const [deactivatingAccount, setDeactivatingAccount] = useState(false);
+  const [deactivateError, setDeactivateError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const walletChange = data?.walletChange;
@@ -220,6 +228,43 @@ export default function SettingsPage() {
       );
     } finally {
       setSavingPassword(false);
+    }
+  };
+
+  const openDeactivateModal = () => {
+    setDeactivateUsername("");
+    setDeactivateError(null);
+    setDeactivateModalOpen(true);
+  };
+
+  const closeDeactivateModal = () => {
+    if (deactivatingAccount) return;
+    setDeactivateModalOpen(false);
+    setDeactivateUsername("");
+    setDeactivateError(null);
+  };
+
+  const handleDeactivateAccount = async () => {
+    if (!data?.username) return;
+
+    if (deactivateUsername.trim() !== data.username) {
+      setDeactivateError("Username does not match your account.");
+      return;
+    }
+
+    setDeactivatingAccount(true);
+    setDeactivateError(null);
+
+    try {
+      await deactivateAccountApi(data.username);
+      setDeactivateModalOpen(false);
+      await signOut();
+    } catch (err) {
+      setDeactivateError(
+        err instanceof Error ? err.message : "Failed to deactivate account"
+      );
+    } finally {
+      setDeactivatingAccount(false);
     }
   };
 
@@ -507,6 +552,36 @@ export default function SettingsPage() {
           ))}
         </div>
       </section>
+
+      <section className="rounded-xl border border-[var(--color-creator-danger)]/25 bg-creator-card p-4 md:p-6">
+        <h3 className="flex items-center gap-2 text-lg font-semibold text-creator-text-primary">
+          <UserX className="h-5 w-5 text-[var(--color-creator-danger)]" />
+          Deactivate Account
+        </h3>
+        <p className="mt-1 text-sm text-creator-text-secondary">
+          Permanently deactivate your creator account. You will lose access to
+          your dashboard, referral earnings, and payout wallet.
+        </p>
+
+        <button
+          type="button"
+          onClick={openDeactivateModal}
+          className="mt-6 inline-flex items-center gap-2 rounded-xl border border-[var(--color-creator-danger)]/40 bg-[var(--color-creator-danger)]/10 px-4 py-2.5 text-sm font-semibold text-[var(--color-creator-danger)] transition-opacity hover:opacity-90"
+        >
+          Deactivate Account
+        </button>
+      </section>
+
+      <DeactivateAccountModal
+        open={deactivateModalOpen}
+        username={data?.username ?? ""}
+        confirmUsername={deactivateUsername}
+        loading={deactivatingAccount}
+        error={deactivateError}
+        onConfirmUsernameChange={setDeactivateUsername}
+        onClose={closeDeactivateModal}
+        onConfirm={handleDeactivateAccount}
+      />
     </div>
   );
 }
