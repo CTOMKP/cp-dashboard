@@ -24,7 +24,7 @@ export default function RootLayout({
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var p=location.pathname;var forceDark=p==="/"||p==="/login"||p==="/creator/signup"||p==="/creator/login"||p==="/creator-signup";if(forceDark){document.documentElement.classList.remove("light");document.documentElement.classList.add("dark");return;}var t=localStorage.getItem("ctom-creator-theme");document.documentElement.classList.remove("dark","light");document.documentElement.classList.add(t==="light"?"light":"dark");}catch(e){document.documentElement.classList.add("dark");}})();`,
+            __html: `(function(){try{document.documentElement.classList.remove("light");document.documentElement.classList.add("dark");}catch(e){}})();`,
           }}
         />
       </head>

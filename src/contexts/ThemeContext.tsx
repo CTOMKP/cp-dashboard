@@ -22,26 +22,18 @@ const ThemeContext = createContext<ThemeContextValue>({
 
 const STORAGE_KEY = "ctom-creator-theme";
 
-function applyTheme(theme: Theme) {
-  document.documentElement.classList.remove("dark", "light");
-  document.documentElement.classList.add(theme);
-}
-
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>("dark");
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
-    const initial = stored === "light" ? "light" : "dark";
-    setTheme(initial);
-    applyTheme(initial);
+    setTheme(stored === "light" ? "light" : "dark");
   }, []);
 
   const toggleTheme = useCallback(() => {
     setTheme((prev) => {
       const next = prev === "dark" ? "light" : "dark";
       localStorage.setItem(STORAGE_KEY, next);
-      applyTheme(next);
       return next;
     });
   }, []);
@@ -55,4 +47,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
 export function useTheme() {
   return useContext(ThemeContext);
+}
+
+export function creatorThemeClass(theme: Theme) {
+  return theme === "light" ? "creator-theme-light" : "creator-theme-dark";
 }

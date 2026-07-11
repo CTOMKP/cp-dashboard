@@ -3,7 +3,11 @@
 import { usePathname } from "next/navigation";
 import Sidebar from "@/components/creator/layout/Sidebar";
 import TopBar from "@/components/creator/layout/TopBar";
-import { ThemeProvider } from "@/contexts/ThemeContext";
+import {
+  ThemeProvider,
+  creatorThemeClass,
+  useTheme,
+} from "@/contexts/ThemeContext";
 import { CreatorProfileProvider } from "@/contexts/CreatorProfileContext";
 import { CreatorNotificationProvider } from "@/contexts/CreatorNotificationContext";
 import { SidebarProvider } from "@/contexts/SidebarContext";
@@ -19,6 +23,31 @@ const pageTitles: Record<string, string> = {
 };
 
 const AUTH_ROUTES = ["/creator/signup", "/creator/login"];
+
+function DashboardChrome({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  const { theme } = useTheme();
+
+  return (
+    <div
+      className={`creator-shell ${creatorThemeClass(theme)}`}
+    >
+      <Sidebar />
+      <div className="md:pl-60">
+        <TopBar title={title} />
+        <main className="px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-6 md:py-6">
+          <div className="mx-auto max-w-[1200px]">{children}</div>
+        </main>
+      </div>
+      <NotificationToasts />
+    </div>
+  );
+}
 
 export default function CreatorLayout({
   children,
@@ -39,16 +68,7 @@ export default function CreatorLayout({
       <CreatorProfileProvider>
         <CreatorNotificationProvider>
           <SidebarProvider>
-            <div className="creator-shell">
-              <Sidebar />
-              <div className="md:pl-60">
-                <TopBar title={title} />
-                <main className="px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-6 md:py-6">
-                  <div className="mx-auto max-w-[1200px]">{children}</div>
-                </main>
-              </div>
-              <NotificationToasts />
-            </div>
+            <DashboardChrome title={title}>{children}</DashboardChrome>
           </SidebarProvider>
         </CreatorNotificationProvider>
       </CreatorProfileProvider>
