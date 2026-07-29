@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { Menu, Moon, Sun } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -56,21 +55,11 @@ export default function TopBar({ title }: TopBarProps) {
           aria-label="Profile settings"
         >
           {profile?.profileImageUrl ? (
-            profile.profileImageUrl.startsWith("data:") ? (
-              <img
-                src={profile.profileImageUrl}
-                alt={profile.username}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <Image
-                src={profile.profileImageUrl}
-                alt={profile.username}
-                width={32}
-                height={32}
-                className="h-full w-full object-cover"
-              />
-            )
+            <img
+              src={profile.profileImageUrl}
+              alt={profile.username}
+              className="h-full w-full object-cover"
+            />
           ) : (
             <span className="flex h-full w-full items-center justify-center text-xs font-bold text-white">
               {initial}

@@ -7,7 +7,6 @@ import {
   Loader2,
   Wallet,
 } from "lucide-react";
-import { getPayouts, requestPayout } from "@/lib/api/creator";
 import { formatCurrency, formatDate, truncateWallet } from "@/lib/format";
 import { getDefaultPayoutChain, getPayoutChain } from "@/lib/payout-chains";
 import {
@@ -15,18 +14,21 @@ import {
   getActivePayoutWallet,
   isWalletChangePending,
 } from "@/lib/wallet-change";
-import type { PayoutChainId, PayoutRecord, PayoutsData } from "@/types/creator";
+import type { PayoutChainId, PayoutRecord } from "@/types/creator";
 import BlockchainSelector from "@/components/creator/payouts/BlockchainSelector";
 import StatCard from "@/components/creator/ui/StatCard";
 import { StatCardSkeleton } from "@/components/creator/ui/Skeleton";
 import Badge from "@/components/creator/ui/Badge";
 import EmptyState from "@/components/creator/ui/EmptyState";
 import ErrorState from "@/components/creator/ui/ErrorState";
+import { useCreatorPayoutsQuery } from "@/hooks/useCreatorQueries";
+import { useRequestPayoutMutation } from "@/hooks/mutations/useRequestPayoutMutation";
+import { isApiError } from "@/lib/apiError";
 
 const MIN_PAYOUT = 10;
 
 function statusVariant(
-  status: string
+  status: string,
 ): "yellow" | "blue" | "green" | "red" | "grey" {
   switch (status) {
     case "pending":
@@ -43,42 +45,28 @@ function statusVariant(
 }
 
 export default function PayoutsPage() {
-  const [data, setData] = useState<PayoutsData | null>(null);
+  const { data, isLoading, error, refetch } = useCreatorPayoutsQuery();
+  const requestPayoutMutation = useRequestPayoutMutation();
   const [selectedChain, setSelectedChain] = useState<PayoutChainId>("solana");
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [countdown, setCountdown] = useState("");
 
+  useEffect(() => {
+    if (data?.savedChain) {
+      setSelectedChain(data.savedChain);
+    }
+  }, [data?.savedChain]);
+
   const activeChain = useMemo(
     () => getPayoutChain(selectedChain) ?? getDefaultPayoutChain(),
-    [selectedChain]
+    [selectedChain],
   );
 
   const walletChange = data?.walletChange;
   const isPending = isWalletChangePending(
-    walletChange?.walletChangePendingUntil
+    walletChange?.walletChangePendingUntil,
   );
   const activePayoutWallet = data ? getActivePayoutWallet(data) : "";
-
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await getPayouts();
-      setData(result);
-      setSelectedChain(result.savedChain ?? "solana");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load payouts");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
 
   useEffect(() => {
     if (!isPending || !walletChange?.walletChangePendingUntil) {
@@ -101,9 +89,9 @@ export default function PayoutsPage() {
       walletChange?.walletChangePendingUntil &&
       countdown === "0h 0m 0s"
     ) {
-      fetchData();
+      void refetch();
     }
-  }, [countdown, isPending, walletChange?.walletChangePendingUntil, fetchData]);
+  }, [countdown, isPending, walletChange?.walletChangePendingUntil, refetch]);
 
   const canRequest =
     (data?.availableBalance ?? 0) >= MIN_PAYOUT &&
@@ -119,27 +107,33 @@ export default function PayoutsPage() {
   const handleRequest = async () => {
     if (!data || !canRequest) return;
 
-    setSubmitting(true);
     setSubmitError(null);
     try {
-      await requestPayout(
-        activePayoutWallet,
-        data.availableBalance,
-        selectedChain
-      );
-      await fetchData();
+      await requestPayoutMutation.mutateAsync({
+        walletAddress: activePayoutWallet,
+        amount: data.availableBalance,
+      });
     } catch (err) {
       setSubmitError(
-        err instanceof Error ? err.message : "Failed to request payout"
+        isApiError(err)
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Failed to request payout",
       );
-    } finally {
-      setSubmitting(false);
     }
   };
 
   if (error) {
-    return <ErrorState message={error} onRetry={fetchData} />;
+    return (
+      <ErrorState
+        message={error instanceof Error ? error.message : "Failed to load payouts"}
+        onRetry={() => void refetch()}
+      />
+    );
   }
+
+  const submitting = requestPayoutMutation.isPending;
 
   return (
     <div className="space-y-6">
@@ -148,7 +142,7 @@ export default function PayoutsPage() {
       </h2>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {loading ? (
+        {isLoading ? (
           <>
             <StatCardSkeleton />
             <StatCardSkeleton />
@@ -229,7 +223,7 @@ export default function PayoutsPage() {
             <div className="group relative border-t border-creator-border pt-6">
               <button
                 type="button"
-                onClick={handleRequest}
+                onClick={() => void handleRequest()}
                 disabled={!canRequest || submitting}
                 className="creator-btn-primary w-full rounded-xl px-4 py-3 text-sm disabled:cursor-not-allowed"
               >
@@ -269,7 +263,7 @@ export default function PayoutsPage() {
         )}
       </div>
 
-      {loading ? (
+      {isLoading ? (
         <div className="rounded-xl border border-creator-border bg-creator-card p-4">
           <div className="animate-pulse space-y-2">
             {Array.from({ length: 3 }).map((_, i) => (
@@ -315,49 +309,49 @@ export default function PayoutsPage() {
           </div>
           <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-creator-border text-xs text-creator-text-secondary">
-                <th className="px-4 py-3 font-medium">Date Requested</th>
-                <th className="px-4 py-3 font-medium">Amount</th>
-                <th className="px-4 py-3 font-medium">Chain</th>
-                <th className="px-4 py-3 font-medium">Wallet</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-                <th className="px-4 py-3 font-medium">Notes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.payouts.map((payout: PayoutRecord, i: number) => (
-                <tr
-                  key={payout.id}
-                  className={`border-b border-creator-border last:border-0 ${
-                    i % 2 === 0 ? "bg-creator-bg/30" : ""
-                  }`}
-                >
-                  <td className="px-4 py-3 text-creator-text-secondary">
-                    {formatDate(payout.dateRequested)}
-                  </td>
-                  <td className="px-4 py-3 font-medium text-creator-text-primary">
-                    {formatCurrency(payout.amount)}
-                  </td>
-                  <td className="px-4 py-3">
-                    <Badge variant="teal">
-                      {payout.chain === "solana" ? "Solana USDC" : "Base USDC"}
-                    </Badge>
-                  </td>
-                  <td className="px-4 py-3 font-mono text-xs text-creator-text-secondary">
-                    {truncateWallet(payout.wallet)}
-                  </td>
-                  <td className="px-4 py-3">
-                    <Badge variant={statusVariant(payout.status)}>
-                      {payout.status}
-                    </Badge>
-                  </td>
-                  <td className="px-4 py-3 text-creator-text-secondary">
-                    {payout.notes ?? "—"}
-                  </td>
+              <thead>
+                <tr className="border-b border-creator-border text-xs text-creator-text-secondary">
+                  <th className="px-4 py-3 font-medium">Date Requested</th>
+                  <th className="px-4 py-3 font-medium">Amount</th>
+                  <th className="px-4 py-3 font-medium">Chain</th>
+                  <th className="px-4 py-3 font-medium">Wallet</th>
+                  <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 font-medium">Notes</th>
                 </tr>
-              ))}
-            </tbody>
+              </thead>
+              <tbody>
+                {data.payouts.map((payout: PayoutRecord, i: number) => (
+                  <tr
+                    key={payout.id}
+                    className={`border-b border-creator-border last:border-0 ${
+                      i % 2 === 0 ? "bg-creator-bg/30" : ""
+                    }`}
+                  >
+                    <td className="px-4 py-3 text-creator-text-secondary">
+                      {formatDate(payout.dateRequested)}
+                    </td>
+                    <td className="px-4 py-3 font-medium text-creator-text-primary">
+                      {formatCurrency(payout.amount)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge variant="teal">
+                        {payout.chain === "solana" ? "Solana USDC" : "Base USDC"}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs text-creator-text-secondary">
+                      {truncateWallet(payout.wallet)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge variant={statusVariant(payout.status)}>
+                        {payout.status}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-3 text-creator-text-secondary">
+                      {payout.notes ?? "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
             </table>
           </div>
         </div>

@@ -13,14 +13,9 @@ import {
   UserX,
   Wallet,
 } from "lucide-react";
-import {
-  deactivateAccount as deactivateAccountApi,
-  getSettings,
-  resetPassword,
-  updateSettings,
-  updateWalletAddress,
-} from "@/lib/api/creator";
-import { signOut } from "@/lib/auth";
+import { authService } from "@/services/authService";
+import { useQueryClient } from "@tanstack/react-query";
+import { profileKeys } from "@/lib/queryKeys";
 import { useCreatorProfile } from "@/contexts/CreatorProfileContext";
 import { maskEmail, truncateWallet, formatDate } from "@/lib/format";
 import {
@@ -39,7 +34,9 @@ import { Skeleton } from "@/components/creator/ui/Skeleton";
 import DeactivateAccountModal from "@/components/creator/settings/DeactivateAccountModal";
 
 export default function SettingsPage() {
-  const { profile, updateProfile, refreshProfile } = useCreatorProfile();
+  const queryClient = useQueryClient();
+  const { profile, updateProfile, refreshProfile, loading: profileLoading } =
+    useCreatorProfile();
   const [data, setData] = useState<CreatorSettingsData | null>(null);
   const [username, setUsername] = useState("");
   const [profilePreview, setProfilePreview] = useState<string | undefined>();
@@ -73,27 +70,9 @@ export default function SettingsPage() {
   const activeChain = useMemo(() => getDefaultPayoutChain(), []);
 
   const fetchData = useCallback(async () => {
-    setLoading(true);
     setError(null);
-    try {
-      const result = await getSettings();
-      const profileImageUrl =
-        result.profileImageUrl ?? profile?.profileImageUrl;
-      setData({ ...result, profileImageUrl });
-      setUsername(result.username);
-      setProfilePreview(profileImageUrl);
-
-      if (isWalletChangePending(result.walletChange?.walletChangePendingUntil)) {
-        setWalletAddress(result.walletChange?.pendingWalletAddress ?? "");
-      } else {
-        setWalletAddress(result.wallets[0]?.address ?? "");
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load settings");
-    } finally {
-      setLoading(false);
-    }
-  }, [profile?.profileImageUrl]);
+    await refreshProfile();
+  }, [refreshProfile]);
 
   useEffect(() => {
     if (profile?.profileImageUrl) {
@@ -102,8 +81,23 @@ export default function SettingsPage() {
   }, [profile?.profileImageUrl]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (profileLoading) {
+      setLoading(true);
+      return;
+    }
+
+    if (!profile) {
+      setLoading(false);
+      return;
+    }
+
+    setError(null);
+    setData(profile);
+    setUsername(profile.username);
+    setProfilePreview(profile.profileImageUrl);
+    setWalletAddress(profile.wallets[0]?.address ?? "");
+    setLoading(false);
+  }, [profile, profileLoading]);
 
   useEffect(() => {
     if (!isPending || !walletChange?.walletChangePendingUntil) {
@@ -165,8 +159,7 @@ export default function SettingsPage() {
     setSavingWallet(true);
     setWalletError(null);
     try {
-      await updateWalletAddress(walletAddress.trim(), "solana");
-      await fetchData();
+      throw new Error("Wallet updates are not available yet.");
     } catch (err) {
       setWalletError(
         err instanceof Error ? err.message : "Failed to update wallet"
@@ -192,14 +185,28 @@ export default function SettingsPage() {
     setSavingProfile(true);
     setProfileError(null);
     try {
-      const updated = await updateSettings({
-        username: data?.usernameLocked ? data.username : username.trim(),
-        profileImageUrl: profilePreview,
+      const updated = await authService.updateUser({
+        name: data?.usernameLocked ? data.username : username.trim(),
+        avatarUrl:
+          profilePreview && !profilePreview.startsWith("data:")
+            ? profilePreview
+            : undefined,
       });
-      setData(updated);
-      setUsername(updated.username);
-      setProfilePreview(updated.profileImageUrl ?? profilePreview);
-      updateProfile(updated);
+      const nextSettings: CreatorSettingsData = {
+        ...(data ?? {
+          username: updated.name ?? username.trim(),
+          email: updated.email,
+          wallets: [],
+        }),
+        username: updated.name ?? username.trim(),
+        email: updated.email,
+        profileImageUrl: updated.avatarUrl ?? profilePreview,
+      };
+      setData(nextSettings);
+      setUsername(nextSettings.username);
+      setProfilePreview(nextSettings.profileImageUrl);
+      updateProfile(nextSettings);
+      await queryClient.invalidateQueries({ queryKey: profileKeys.all });
       await refreshProfile();
       setProfileSaved(true);
       setTimeout(() => setProfileSaved(false), 2000);
@@ -216,12 +223,9 @@ export default function SettingsPage() {
     setSavingPassword(true);
     setPasswordError(null);
     try {
-      await resetPassword({ currentPassword, newPassword, confirmPassword });
-      setPasswordSaved(true);
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-      setTimeout(() => setPasswordSaved(false), 2000);
+      throw new Error(
+        "Password reset is managed through your email login provider.",
+      );
     } catch (err) {
       setPasswordError(
         err instanceof Error ? err.message : "Failed to reset password"
@@ -256,9 +260,7 @@ export default function SettingsPage() {
     setDeactivateError(null);
 
     try {
-      await deactivateAccountApi(data.username);
-      setDeactivateModalOpen(false);
-      await signOut();
+      throw new Error("Account deactivation is not available yet.");
     } catch (err) {
       setDeactivateError(
         err instanceof Error ? err.message : "Failed to deactivate account"

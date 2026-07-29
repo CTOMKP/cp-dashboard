@@ -1,7 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { getEarnings } from "@/lib/api/creator";
+import { useMemo, useState, useEffect } from "react";
 import { formatCurrency, formatDateTime } from "@/lib/format";
 import type { EarningTransaction } from "@/types/creator";
 import StatCard from "@/components/creator/ui/StatCard";
@@ -12,6 +11,7 @@ import Pagination from "@/components/creator/ui/Pagination";
 import EmptyState from "@/components/creator/ui/EmptyState";
 import ErrorState from "@/components/creator/ui/ErrorState";
 import { DollarSign } from "lucide-react";
+import { useCreatorEarningsQuery } from "@/hooks/useCreatorQueries";
 
 const PAGE_SIZE = 10;
 
@@ -24,37 +24,18 @@ function typeVariant(type: string): "teal" | "purple" {
 }
 
 export default function EarningsPage() {
-  const [transactions, setTransactions] = useState<EarningTransaction[]>([]);
-  const [totalEarned, setTotalEarned] = useState(0);
-  const [thisMonth, setThisMonth] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data, isLoading, error, refetch } = useCreatorEarningsQuery();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await getEarnings();
-      setTransactions(result.transactions);
-      setTotalEarned(result.totalEarned);
-      setThisMonth(result.thisMonth);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load earnings");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const transactions = data?.transactions ?? [];
+  const totalEarned = data?.totalEarned ?? 0;
+  const thisMonth = data?.thisMonth ?? 0;
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return transactions.filter((t) =>
-      typeLabel(t.type).toLowerCase().includes(q)
+      typeLabel(t.type).toLowerCase().includes(q),
     );
   }, [transactions, search]);
 
@@ -66,7 +47,12 @@ export default function EarningsPage() {
   }, [search]);
 
   if (error) {
-    return <ErrorState message={error} onRetry={fetchData} />;
+    return (
+      <ErrorState
+        message={error instanceof Error ? error.message : "Failed to load earnings"}
+        onRetry={() => void refetch()}
+      />
+    );
   }
 
   return (
@@ -76,7 +62,7 @@ export default function EarningsPage() {
       </h2>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {loading ? (
+        {isLoading ? (
           <>
             <StatCardSkeleton />
             <StatCardSkeleton />
@@ -99,7 +85,7 @@ export default function EarningsPage() {
         )}
       </div>
 
-      {loading ? (
+      {isLoading ? (
         <div className="rounded-xl border border-creator-border bg-creator-card p-4">
           <div className="animate-pulse space-y-2">
             {Array.from({ length: 5 }).map((_, i) => (
@@ -119,7 +105,7 @@ export default function EarningsPage() {
             />
           </div>
           <div className="divide-y divide-creator-border md:hidden">
-            {paginated.map((tx) => (
+            {paginated.map((tx: EarningTransaction) => (
               <div key={tx.id} className="space-y-2 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -155,7 +141,7 @@ export default function EarningsPage() {
                 </tr>
               </thead>
               <tbody>
-                {paginated.map((tx, i) => (
+                {paginated.map((tx: EarningTransaction, i: number) => (
                   <tr
                     key={tx.id}
                     className={`border-b border-creator-border last:border-0 ${

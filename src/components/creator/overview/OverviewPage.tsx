@@ -1,6 +1,5 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowUpRight,
@@ -8,39 +7,24 @@ import {
   Trophy,
   Users,
 } from "lucide-react";
-import { getDashboard } from "@/lib/api/creator";
 import { formatCurrency, getTierColor } from "@/lib/format";
-import type { DashboardData } from "@/types/creator";
 import StatCard from "@/components/creator/ui/StatCard";
 import { StatCardSkeleton } from "@/components/creator/ui/Skeleton";
 import ErrorState from "@/components/creator/ui/ErrorState";
 import EarningsChart from "@/components/creator/charts/EarningsChart";
 import TierProgressBar from "@/components/creator/charts/TierProgressBar";
+import { useCreatorDashboardQuery } from "@/hooks/useCreatorQueries";
 
 export default function OverviewPage() {
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await getDashboard();
-      setData(result);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load dashboard");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const { data, isLoading, error, refetch } = useCreatorDashboardQuery();
 
   if (error) {
-    return <ErrorState message={error} onRetry={fetchData} />;
+    return (
+      <ErrorState
+        message={error instanceof Error ? error.message : "Failed to load dashboard"}
+        onRetry={() => void refetch()}
+      />
+    );
   }
 
   return (
@@ -50,7 +34,7 @@ export default function OverviewPage() {
       </h2>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {loading ? (
+        {isLoading ? (
           Array.from({ length: 4 }).map((_, i) => (
             <StatCardSkeleton key={i} />
           ))
@@ -60,9 +44,15 @@ export default function OverviewPage() {
               title="Total Referrals"
               value={data.totalReferrals}
               subtext={
-                <span className="text-[var(--color-creator-info)]">
-                  ↑ {data.newReferralsThisWeek} new this week
-                </span>
+                data.newReferralsThisWeek != null ? (
+                  <span className="text-[var(--color-creator-info)]">
+                    ↑ {data.newReferralsThisWeek} new this week
+                  </span>
+                ) : (
+                  <span className="text-creator-text-secondary">
+                    Weekly count pending from backend
+                  </span>
+                )
               }
               icon={Users}
             />
@@ -106,14 +96,14 @@ export default function OverviewPage() {
 
       <EarningsChart
         data={data?.earningsLast30Days ?? []}
-        loading={loading}
+        loading={isLoading}
       />
 
       <TierProgressBar
         currentTier={data?.currentTier ?? "STARTER"}
         activeReferrals={data?.activeReferrals ?? 0}
         referralsForNextTier={data?.referralsForNextTier ?? 0}
-        loading={loading}
+        loading={isLoading}
       />
     </div>
   );

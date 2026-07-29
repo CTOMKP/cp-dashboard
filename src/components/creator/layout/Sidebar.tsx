@@ -14,7 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { useSidebar } from "@/contexts/SidebarContext";
-import { signOut } from "@/lib/auth";
+import { usePrivyAuth } from "@/hooks/usePrivyAuth";
 
 const navItems = [
   { href: "/creator", label: "Overview", icon: Home, exact: true },
@@ -28,6 +28,7 @@ const navItems = [
 export default function Sidebar() {
   const pathname = usePathname();
   const { isOpen, closeSidebar } = useSidebar();
+  const { logout } = usePrivyAuth();
 
   return (
     <>
@@ -93,7 +94,7 @@ export default function Sidebar() {
             type="button"
             onClick={() => {
               closeSidebar();
-              void signOut();
+              void logout();
             }}
             className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm text-creator-text-secondary transition-colors hover:bg-creator-accent-muted hover:text-creator-text-primary"
           >

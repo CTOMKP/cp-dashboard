@@ -1,12 +1,15 @@
+"use client";
+
+import { privyService } from "@/services/privyService";
+import { useSessionStore } from "@/lib/sessionStore";
+
+/**
+ * Clears local session storage. Prefer `usePrivyAuth().logout()` when Privy
+ * context is available — it also clears the Privy session.
+ */
 export async function signOut(): Promise<void> {
-  try {
-    await fetch("/api/creator/auth/logout", {
-      method: "POST",
-      credentials: "include",
-    });
-  } catch {
-    // Still redirect locally if the logout request fails.
-  }
+  privyService.logout();
+  useSessionStore.getState().clear();
 
   if (typeof window !== "undefined") {
     for (const key of Object.keys(sessionStorage)) {
@@ -15,6 +18,6 @@ export async function signOut(): Promise<void> {
       }
     }
 
-    window.location.href = "/creator/login";
+    window.location.href = "/";
   }
 }

@@ -1,7 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { getReferrals } from "@/lib/api/creator";
+import { useMemo, useState, useEffect } from "react";
 import { formatCurrency, formatDate, truncateWallet } from "@/lib/format";
 import type { Referral } from "@/types/creator";
 import ReferralLinkBlock from "@/components/creator/referrals/ReferralLinkBlock";
@@ -11,39 +10,23 @@ import Pagination from "@/components/creator/ui/Pagination";
 import EmptyState from "@/components/creator/ui/EmptyState";
 import ErrorState from "@/components/creator/ui/ErrorState";
 import { TableSkeleton } from "@/components/creator/ui/Skeleton";
+import { useCreatorReferralsQuery } from "@/hooks/useCreatorQueries";
 
 const PAGE_SIZE = 10;
 
 export default function ReferralsPage() {
-  const [referrals, setReferrals] = useState<Referral[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data, isLoading, error, refetch } = useCreatorReferralsQuery();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await getReferrals();
-      setReferrals(result.referrals);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load referrals");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const referrals = data?.referrals ?? [];
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return referrals.filter(
       (r) =>
         r.username?.toLowerCase().includes(q) ||
-        r.wallet.toLowerCase().includes(q)
+        r.wallet.toLowerCase().includes(q),
     );
   }, [referrals, search]);
 
@@ -63,8 +46,11 @@ export default function ReferralsPage() {
       <ReferralLinkBlock />
 
       {error ? (
-        <ErrorState message={error} onRetry={fetchData} />
-      ) : loading ? (
+        <ErrorState
+          message={error instanceof Error ? error.message : "Failed to load referrals"}
+          onRetry={() => void refetch()}
+        />
+      ) : isLoading ? (
         <TableSkeleton rows={5} />
       ) : referrals.length === 0 ? (
         <EmptyState message="No referrals yet. Share your link to get started." />
@@ -78,7 +64,7 @@ export default function ReferralsPage() {
             />
           </div>
           <div className="divide-y divide-creator-border md:hidden">
-            {paginated.map((referral) => (
+            {paginated.map((referral: Referral) => (
               <div key={referral.id} className="space-y-2 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <p className="min-w-0 font-medium text-creator-text-primary">
@@ -118,7 +104,7 @@ export default function ReferralsPage() {
                 </tr>
               </thead>
               <tbody>
-                {paginated.map((referral, i) => (
+                {paginated.map((referral: Referral, i: number) => (
                   <tr
                     key={referral.id}
                     className={`border-b border-creator-border last:border-0 ${

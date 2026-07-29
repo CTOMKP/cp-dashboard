@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import PrivyProvider from "@/components/PrivyProvider";
 import RouteThemeGuard from "@/components/RouteThemeGuard";
+import { PrivyAuthProvider } from "@/contexts/PrivyAuthContext";
+import { QueryProvider } from "@/providers/QueryProvider";
 import "./globals.css";
 
 const inter = Inter({
@@ -29,8 +32,14 @@ export default function RootLayout({
         />
       </head>
       <body className={`${inter.variable} bg-[#0A0A0A] text-white antialiased`}>
-        <RouteThemeGuard />
-        {children}
+        <PrivyProvider>
+          <QueryProvider>
+            <PrivyAuthProvider>
+              <RouteThemeGuard />
+              {children}
+            </PrivyAuthProvider>
+          </QueryProvider>
+        </PrivyProvider>
       </body>
     </html>
   );

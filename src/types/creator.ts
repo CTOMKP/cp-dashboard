@@ -17,7 +17,7 @@ export interface EarningsDataPoint {
 
 export interface DashboardData {
   totalReferrals: number;
-  newReferralsThisWeek: number;
+  newReferralsThisWeek: number | null;
   thisMonthEarnings: number;
   currentTier: CreatorTier;
   tierCutPercent: number;
@@ -124,5 +124,5 @@ export interface CreatorSettingsData {
 export interface ReferralCodeData {
   referralCode: string;
   referralLink: string;
-  landingPageUrl: string;
+  landingPageUrl: string | null;
 }

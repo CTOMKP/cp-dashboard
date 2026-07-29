@@ -1,13 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { Download } from "lucide-react";
-import { getReferralCode } from "@/lib/api/creator";
-import type { ReferralCodeData } from "@/types/creator";
 import CopyButton from "@/components/creator/ui/CopyButton";
 import { Skeleton } from "@/components/creator/ui/Skeleton";
 import ErrorState from "@/components/creator/ui/ErrorState";
+import { useCreatorReferralCodeQuery } from "@/hooks/useCreatorQueries";
 
 function ShareOnX({ link }: { link: string }) {
   const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(`Join CTOMarketplace and start earning! ${link}`)}`;
@@ -68,26 +67,7 @@ function ShareOnInstagram({ link }: { link: string }) {
 }
 
 export default function ReferralLinkBlock() {
-  const [data, setData] = useState<ReferralCodeData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await getReferralCode();
-      setData(result);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load referral code");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const { data, isLoading, error, refetch } = useCreatorReferralCodeQuery();
 
   const downloadQR = useCallback(() => {
     if (!data) return;
@@ -110,10 +90,15 @@ export default function ReferralLinkBlock() {
   }, [data]);
 
   if (error) {
-    return <ErrorState message={error} onRetry={fetchData} />;
+    return (
+      <ErrorState
+        message={error instanceof Error ? error.message : "Failed to load referral code"}
+        onRetry={() => void refetch()}
+      />
+    );
   }
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="rounded-xl border border-creator-border bg-creator-card p-6">
         <Skeleton className="mb-4 h-5 w-36" />

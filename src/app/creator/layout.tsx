@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import Sidebar from "@/components/creator/layout/Sidebar";
 import TopBar from "@/components/creator/layout/TopBar";
+import AuthGuard from "@/components/creator/auth/AuthGuard";
 import {
   ThemeProvider,
   creatorThemeClass,
@@ -22,8 +23,6 @@ const pageTitles: Record<string, string> = {
   "/creator/settings": "Settings",
 };
 
-const AUTH_ROUTES = ["/creator/signup", "/creator/login"];
-
 function DashboardChrome({
   title,
   children,
@@ -34,9 +33,7 @@ function DashboardChrome({
   const { theme } = useTheme();
 
   return (
-    <div
-      className={`creator-shell ${creatorThemeClass(theme)}`}
-    >
+    <div className={`creator-shell ${creatorThemeClass(theme)}`}>
       <Sidebar />
       <div className="md:pl-60">
         <TopBar title={title} />
@@ -55,23 +52,19 @@ export default function CreatorLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const isAuthRoute = AUTH_ROUTES.includes(pathname);
-
-  if (isAuthRoute) {
-    return <>{children}</>;
-  }
-
   const title = pageTitles[pathname] ?? "Creator Dashboard";
 
   return (
-    <ThemeProvider>
-      <CreatorProfileProvider>
-        <CreatorNotificationProvider>
-          <SidebarProvider>
-            <DashboardChrome title={title}>{children}</DashboardChrome>
-          </SidebarProvider>
-        </CreatorNotificationProvider>
-      </CreatorProfileProvider>
-    </ThemeProvider>
+    <AuthGuard>
+      <ThemeProvider>
+        <CreatorProfileProvider>
+          <CreatorNotificationProvider>
+            <SidebarProvider>
+              <DashboardChrome title={title}>{children}</DashboardChrome>
+            </SidebarProvider>
+          </CreatorNotificationProvider>
+        </CreatorProfileProvider>
+      </ThemeProvider>
+    </AuthGuard>
   );
 }

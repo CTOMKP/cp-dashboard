@@ -3,8 +3,7 @@
 import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 import { Check, ChevronDown, Copy, Download, Loader2 } from "lucide-react";
-import { getReferralCode } from "@/lib/api/creator";
-import type { ReferralCodeData } from "@/types/creator";
+import { useCreatorReferralCodeQuery } from "@/hooks/useCreatorQueries";
 import CopyButton from "@/components/creator/ui/CopyButton";
 import Badge from "@/components/creator/ui/Badge";
 import { Skeleton } from "@/components/creator/ui/Skeleton";
@@ -274,26 +273,7 @@ function BannerPlaceholder({
 }
 
 export default function ContentPage() {
-  const [linkData, setLinkData] = useState<ReferralCodeData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await getReferralCode();
-      setLinkData(result);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load links");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const { data: linkData, isLoading, error, refetch } = useCreatorReferralCodeQuery();
 
   return (
     <div className="space-y-8">
@@ -313,9 +293,12 @@ export default function ContentPage() {
         </h3>
         {error ? (
           <div className="mt-4">
-            <ErrorState message={error} onRetry={fetchData} />
+            <ErrorState
+              message={error instanceof Error ? error.message : "Failed to load links"}
+              onRetry={() => void refetch()}
+            />
           </div>
-        ) : loading ? (
+        ) : isLoading ? (
           <div className="mt-4 space-y-4">
             <Skeleton className="h-16 w-full" />
             <Skeleton className="h-16 w-full" />
@@ -342,10 +325,13 @@ export default function ContentPage() {
               <div className="flex flex-col gap-2 sm:flex-row">
                 <input
                   readOnly
-                  value={linkData.landingPageUrl}
-                  className="min-w-0 flex-1 rounded-lg border border-creator-border bg-creator-card px-4 py-2.5 text-sm text-creator-text-primary"
+                  value={linkData.landingPageUrl ?? ""}
+                  placeholder="Pending from backend"
+                  className="min-w-0 flex-1 rounded-lg border border-creator-border bg-creator-card px-4 py-2.5 text-sm text-creator-text-primary placeholder:text-creator-text-secondary"
                 />
-                <CopyButton text={linkData.landingPageUrl} />
+                {linkData.landingPageUrl ? (
+                  <CopyButton text={linkData.landingPageUrl} />
+                ) : null}
               </div>
             </div>
           </div>
