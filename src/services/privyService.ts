@@ -12,6 +12,10 @@ import {
 } from "@/lib/authSession";
 import type { BackendWallet } from "@/types/privy";
 import { saveWalletsToStorage } from "@/utils/localStorage";
+import {
+  clearPendingReferralCode,
+  getPendingReferralCode,
+} from "@/lib/referralAttribution";
 
 const getSyncUrl = () => `${getBackendBaseUrl()}/api/v1/auth/privy/sync`;
 
@@ -75,7 +79,10 @@ class PrivyService {
     try {
       response = await apiPost<unknown>(
         getSyncUrl(),
-        { privyToken: freshToken },
+        {
+          privyToken: freshToken,
+          referralCode: getPendingReferralCode() || undefined,
+        },
         { auth: false },
       );
     } catch (error: unknown) {
@@ -95,6 +102,7 @@ class PrivyService {
     const responseData: SyncResponseData = rawResponse as SyncResponseData;
 
     if (this.isSyncSuccessPayload(responseData)) {
+      clearPendingReferralCode();
       setAuthToken(responseData.token);
       localStorage.setItem(USER_EMAIL_KEY, responseData.user.email);
       localStorage.setItem(USER_ID_KEY, responseData.user.id.toString());
@@ -143,6 +151,7 @@ class PrivyService {
         responseData.user.id);
 
     if (possibleUserId && responseData?.token) {
+      clearPendingReferralCode();
       setAuthToken(responseData.token);
       localStorage.setItem(USER_ID_KEY, possibleUserId.toString());
       if (responseData.user?.email) {

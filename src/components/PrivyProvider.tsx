@@ -62,11 +62,12 @@ export default function PrivyProvider({ children }: PrivyProviderProps) {
       appId={privyAppId}
       config={{
         solana: { rpcs: solanaRpcs },
-        loginMethods: ["email"],
+        loginMethods: ["email", "wallet", "google"],
         appearance: {
           theme: "#010101",
           accentColor: "#8B5CF6",
           logo: "/ctom-marketplace-logo.png",
+          showWalletLoginFirst: true,
         },
       }}
     >

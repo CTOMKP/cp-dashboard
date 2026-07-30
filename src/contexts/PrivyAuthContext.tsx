@@ -22,6 +22,7 @@ import { getAuthToken } from "@/lib/authSession";
 import { profileKeys } from "@/lib/queryKeys";
 import { bindSessionStoreListeners, useSessionStore } from "@/lib/sessionStore";
 import type { User } from "@/types/auth.types";
+import { captureReferralCodeFromLocation } from "@/lib/referralAttribution";
 
 const DEFAULT_LOGIN_REDIRECT = "/creator";
 const processingUserIds = new Set<string>();
@@ -73,6 +74,7 @@ export function PrivyAuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     bindSessionStoreListeners();
+    captureReferralCodeFromLocation();
   }, []);
 
   const applyProfile = useCallback((profile: User) => {
@@ -217,7 +219,7 @@ export function PrivyAuthProvider({ children }: { children: ReactNode }) {
       manualLoginInProgress = true;
 
       try {
-        await privyLogin({ loginMethods: ["email"] });
+        await privyLogin({ loginMethods: ["email", "wallet", "google"] });
         const session = await establishSession();
         if (session?.profilePromise) resolveProfile(session.profilePromise);
         setIsAuthenticated(true);
