@@ -43,7 +43,8 @@ export interface ReferralsData {
 export type CreatorNotificationType =
   | "new_referral"
   | "new_earning"
-  | "payout_paid";
+  | "payout_paid"
+  | "welcome";
 
 export interface CreatorNotification {
   id: string;
@@ -115,7 +116,7 @@ export interface CreatorSettingsData {
   deactivatedAt?: string;
   walletChange?: WalletChangeState;
   wallets: {
-    chain: PayoutChainId;
+    chain: string;
     address: string;
     label: string;
   }[];

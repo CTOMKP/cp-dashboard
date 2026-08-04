@@ -82,6 +82,7 @@ class PrivyService {
         {
           privyToken: freshToken,
           referralCode: getPendingReferralCode() || undefined,
+          source: "creator_program",
         },
         { auth: false },
       );
