@@ -24,6 +24,7 @@ import ErrorState from "@/components/creator/ui/ErrorState";
 import { useCreatorPayoutsQuery } from "@/hooks/useCreatorQueries";
 import { useRequestPayoutMutation } from "@/hooks/mutations/useRequestPayoutMutation";
 import { isApiError } from "@/lib/apiError";
+import { useCreatorProfile } from "@/contexts/CreatorProfileContext";
 
 const MIN_PAYOUT = 10;
 
@@ -47,6 +48,7 @@ function statusVariant(
 export default function PayoutsPage() {
   const { data, isLoading, error, refetch } = useCreatorPayoutsQuery();
   const requestPayoutMutation = useRequestPayoutMutation();
+  const { profile } = useCreatorProfile();
   const [selectedChain, setSelectedChain] = useState<PayoutChainId>("solana");
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [countdown, setCountdown] = useState("");
@@ -66,7 +68,12 @@ export default function PayoutsPage() {
   const isPending = isWalletChangePending(
     walletChange?.walletChangePendingUntil,
   );
-  const activePayoutWallet = data ? getActivePayoutWallet(data) : "";
+  const solanaWallet = profile?.wallets?.find(
+    (wallet) => wallet.chain.toUpperCase() === "SOLANA",
+  );
+  const activePayoutWallet = data
+    ? getActivePayoutWallet(data) || solanaWallet?.address || ""
+    : solanaWallet?.address || "";
 
   useEffect(() => {
     if (!isPending || !walletChange?.walletChangePendingUntil) {

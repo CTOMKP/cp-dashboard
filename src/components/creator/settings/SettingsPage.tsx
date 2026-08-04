@@ -1,11 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  AlertCircle,
   Camera,
   Check,
-  Clock,
   Loader2,
   Lock,
   Save,
@@ -17,16 +15,7 @@ import { authService } from "@/services/authService";
 import { useQueryClient } from "@tanstack/react-query";
 import { profileKeys } from "@/lib/queryKeys";
 import { useCreatorProfile } from "@/contexts/CreatorProfileContext";
-import { maskEmail, truncateWallet, formatDate } from "@/lib/format";
-import {
-  getDefaultPayoutChain,
-  isValidSolanaAddress,
-} from "@/lib/payout-chains";
-import {
-  canChangeWallet,
-  formatCountdown,
-  isWalletChangePending,
-} from "@/lib/wallet-change";
+import { maskEmail } from "@/lib/format";
 import type { CreatorSettingsData } from "@/types/creator";
 import ErrorState from "@/components/creator/ui/ErrorState";
 import Badge from "@/components/creator/ui/Badge";
@@ -51,23 +40,11 @@ export default function SettingsPage() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [walletAddress, setWalletAddress] = useState("");
-  const [savingWallet, setSavingWallet] = useState(false);
-  const [walletError, setWalletError] = useState<string | null>(null);
-  const [countdown, setCountdown] = useState("");
   const [deactivateModalOpen, setDeactivateModalOpen] = useState(false);
   const [deactivateUsername, setDeactivateUsername] = useState("");
   const [deactivatingAccount, setDeactivatingAccount] = useState(false);
   const [deactivateError, setDeactivateError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const walletChange = data?.walletChange;
-  const isPending = isWalletChangePending(
-    walletChange?.walletChangePendingUntil
-  );
-  const changeAllowed = canChangeWallet(walletChange?.nextWalletChangeAllowed);
-  const activeWallet = data?.wallets[0]?.address ?? "";
-  const activeChain = useMemo(() => getDefaultPayoutChain(), []);
 
   const fetchData = useCallback(async () => {
     setError(null);
@@ -95,79 +72,8 @@ export default function SettingsPage() {
     setData(profile);
     setUsername(profile.username);
     setProfilePreview(profile.profileImageUrl);
-    setWalletAddress(profile.wallets[0]?.address ?? "");
     setLoading(false);
   }, [profile, profileLoading]);
-
-  useEffect(() => {
-    if (!isPending || !walletChange?.walletChangePendingUntil) {
-      setCountdown("");
-      return;
-    }
-
-    const update = () => {
-      setCountdown(formatCountdown(walletChange.walletChangePendingUntil!));
-    };
-
-    update();
-    const interval = setInterval(update, 1000);
-    return () => clearInterval(interval);
-  }, [isPending, walletChange?.walletChangePendingUntil]);
-
-  useEffect(() => {
-    if (
-      isPending &&
-      walletChange?.walletChangePendingUntil &&
-      countdown === "0h 0m 0s"
-    ) {
-      fetchData();
-    }
-  }, [countdown, isPending, walletChange?.walletChangePendingUntil, fetchData]);
-
-  const walletInputDisabled = isPending || !changeAllowed;
-
-  const handleWalletChange = (value: string) => {
-    if (walletInputDisabled) return;
-    setWalletAddress(value);
-    setWalletError(null);
-  };
-
-  const handleSaveWallet = async () => {
-    if (!walletAddress.trim()) {
-      setWalletError("Please enter your Solana USDC wallet address.");
-      return;
-    }
-    if (!isValidSolanaAddress(walletAddress)) {
-      setWalletError("Enter a valid Solana wallet address.");
-      return;
-    }
-    if (!changeAllowed) {
-      setWalletError(
-        `You can only change your wallet once every 30 days.${
-          walletChange?.nextWalletChangeAllowed
-            ? ` Next change available ${formatDate(walletChange.nextWalletChangeAllowed)}.`
-            : ""
-        }`
-      );
-      return;
-    }
-    if (walletAddress.trim() === activeWallet) {
-      setWalletError("This is already your active payout wallet.");
-      return;
-    }
-
-    setSavingWallet(true);
-    setWalletError(null);
-    try {
-      throw new Error("Wallet updates are not available yet.");
-    } catch (err) {
-      setWalletError(
-        err instanceof Error ? err.message : "Failed to update wallet"
-      );
-    } finally {
-      setSavingWallet(false);
-    }
-  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -463,8 +369,8 @@ export default function SettingsPage() {
           Connected Wallets
         </h3>
         <p className="mt-1 text-sm text-creator-text-secondary">
-          Manage your payout wallet here. Changes can only be made once every 30
-          days and take 72 hours to activate.
+          Wallets connected to your CTO account. Your Solana wallet is used for
+          USDC creator payouts.
         </p>
 
         <div className="mt-6 space-y-3">
@@ -475,81 +381,16 @@ export default function SettingsPage() {
             >
               <Badge variant="teal">{wallet.label}</Badge>
 
-              {isPending && (
-                <div className="mt-4 rounded-xl border border-[var(--color-creator-warning)]/30 bg-[var(--color-creator-warning)]/10 p-4">
-                  <p className="text-sm font-medium text-creator-text-primary">
-                    Wallet change pending. Your new address will activate in 72
-                    hours.
-                  </p>
-                  <p className="mt-2 flex items-center gap-2 text-xs text-creator-text-secondary">
-                    <Clock className="h-3.5 w-3.5" />
-                    Activates in:{" "}
-                    <span className="font-mono text-creator-accent">
-                      {countdown}
-                    </span>
-                  </p>
-                  <p className="mt-2 text-xs text-creator-text-secondary">
-                    Payouts during this period still go to your current wallet:{" "}
-                    <span className="font-mono text-creator-text-primary">
-                      {truncateWallet(activeWallet)}
-                    </span>
-                  </p>
-                </div>
-              )}
-
               <label className="mb-2 mt-4 block text-sm text-creator-text-secondary">
-                {activeChain.walletLabel}
+                {wallet.label} Address
               </label>
               <input
                 type="text"
-                value={walletAddress}
-                onChange={(e) => handleWalletChange(e.target.value)}
-                placeholder={activeChain.walletPlaceholder}
-                disabled={walletInputDisabled}
-                className={`w-full rounded-xl border bg-creator-bg px-4 py-2.5 font-mono text-sm focus:outline-none disabled:cursor-not-allowed ${
-                  walletInputDisabled
-                    ? "border-creator-border/40 bg-creator-bg/70 text-creator-text-secondary"
-                    : "border-creator-border text-creator-text-primary focus:border-creator-accent"
-                }`}
+                value={wallet.address}
+                readOnly
+                disabled
+                className="w-full cursor-not-allowed rounded-xl border border-creator-border/40 bg-creator-bg/70 px-4 py-2.5 font-mono text-sm text-creator-text-secondary focus:outline-none"
               />
-
-              {walletChange?.walletLastChanged && (
-                <p className="mt-2 text-xs text-creator-text-secondary">
-                  Last updated: {formatDate(walletChange.walletLastChanged)}
-                </p>
-              )}
-
-              {walletError && (
-                <p className="mt-2 flex items-center gap-1.5 text-xs text-[var(--color-creator-danger)]">
-                  <AlertCircle className="h-3.5 w-3.5" />
-                  {walletError}
-                </p>
-              )}
-
-              {!isPending &&
-                changeAllowed &&
-                walletAddress.trim() !== activeWallet && (
-                  <button
-                    type="button"
-                    onClick={handleSaveWallet}
-                    disabled={savingWallet}
-                    className="creator-btn-outline mt-4 inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium disabled:opacity-50"
-                  >
-                    {savingWallet && (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    )}
-                    Save Wallet
-                  </button>
-                )}
-
-              {!changeAllowed &&
-                !isPending &&
-                walletChange?.nextWalletChangeAllowed && (
-                  <p className="mt-2 text-xs text-creator-text-secondary">
-                    Next wallet change available:{" "}
-                    {formatDate(walletChange.nextWalletChangeAllowed)}
-                  </p>
-                )}
             </div>
           ))}
         </div>

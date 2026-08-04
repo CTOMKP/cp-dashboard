@@ -30,6 +30,7 @@ const processingUserIds = new Set<string>();
 /** Set when user initiates login; cleared after redirect or failure. */
 let pendingLoginRedirect: string | null = null;
 let activeSessionSync: Promise<void> | null = null;
+let activeHandoffExchange: Promise<User> | null = null;
 let manualLoginInProgress = false;
 
 type LoginOptions = {
@@ -69,6 +70,7 @@ export function PrivyAuthProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [handoffPending, setHandoffPending] = useState(true);
   const [userData, setUserData] = useState<PrivyAuthContextValue["userData"]>(
     null,
   );
@@ -91,6 +93,34 @@ export function PrivyAuthProvider({ children }: { children: ReactNode }) {
     useSessionStore.getState().hydrateFromStorage();
     queryClient.setQueryData(profileKeys.detail(), profile);
   }, [queryClient]);
+
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get("handoff");
+    if (!code) {
+      setHandoffPending(false);
+      return;
+    }
+
+    if (!activeHandoffExchange) {
+      activeHandoffExchange = authService.exchangeHandoff(code);
+    }
+    void activeHandoffExchange
+      .then((profile) => {
+        applyProfile(profile);
+        useSessionStore.getState().setToken(getAuthToken());
+        setIsAuthenticated(true);
+        window.dispatchEvent(new Event("cto-authenticated"));
+        router.replace(DEFAULT_LOGIN_REDIRECT);
+      })
+      .catch((error) => {
+        console.error("Session handoff failed:", error);
+      })
+      .finally(() => {
+        activeHandoffExchange = null;
+        setHandoffPending(false);
+        setIsLoading(false);
+      });
+  }, [applyProfile, router]);
 
   const resolveProfile = useCallback(
     async (profilePromise: Promise<User | null>) => {
@@ -158,7 +188,7 @@ export function PrivyAuthProvider({ children }: { children: ReactNode }) {
   }, [isAuthenticated, finishPendingRedirect]);
 
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || handoffPending) return;
 
     const token = getAuthToken();
     if (token) {
@@ -177,7 +207,7 @@ export function PrivyAuthProvider({ children }: { children: ReactNode }) {
         useSessionStore.getState().clear();
       }
     }
-  }, [ready, authenticated, finishPendingRedirect, hydrateProfile]);
+  }, [ready, authenticated, handoffPending, finishPendingRedirect, hydrateProfile]);
 
   useEffect(() => {
     if (!ready || !authenticated || !user || manualLoginInProgress) return;
@@ -289,7 +319,7 @@ export function PrivyAuthProvider({ children }: { children: ReactNode }) {
       user,
       userData,
       isAuthenticated,
-      isLoading: isLoading || !ready,
+      isLoading: isLoading || !ready || handoffPending,
       ready,
       login,
       logout,
@@ -300,6 +330,7 @@ export function PrivyAuthProvider({ children }: { children: ReactNode }) {
       userData,
       isAuthenticated,
       isLoading,
+      handoffPending,
       ready,
       login,
       logout,
