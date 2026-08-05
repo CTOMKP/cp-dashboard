@@ -1,4 +1,4 @@
-import { apiGet, apiPut } from "@/lib/apiClient";
+import { apiGet, apiPost, apiPut } from "@/lib/apiClient";
 import { toRecord, unwrapApiData } from "@/lib/apiResponse";
 import {
   clearSessionStorage,
@@ -68,6 +68,21 @@ class AuthService {
 
     this.applyUserProfileToStorage(profile);
     return profile;
+  }
+
+  async exchangeHandoff(code: string): Promise<User> {
+    const body = await apiPost<unknown>(
+      "/api/v1/auth/handoff/exchange",
+      { code, target: "creator" },
+      { auth: false, clearSessionOn401: false },
+    );
+    const session = toRecord(unwrapApiData(body));
+    const token = session.access_token;
+    if (typeof token !== "string" || !token) {
+      throw new Error("Session handoff response is missing an access token.");
+    }
+    setAuthToken(token);
+    return this.fetchProfile(undefined, { clearSessionOn401: false });
   }
 
   async updateUser(

@@ -8,6 +8,8 @@ import {
   useState,
 } from "react";
 import type { CreatorNotification } from "@/types/creator";
+import { getAuthToken } from "@/lib/authSession";
+import { creatorNotificationService } from "@/services/creatorNotificationService";
 import {
   preloadEarningsNotificationSound,
   setupEarningsNotificationSoundUnlock,
@@ -58,10 +60,32 @@ export function CreatorNotificationProvider({
   const [toasts, setToasts] = useState<CreatorNotification[]>([]);
 
   const refreshNotifications = useCallback(async () => {
-    setLoading(false);
+    if (!getAuthToken()) {
+      setNotifications([]);
+      setUnreadCount(0);
+      return;
+    }
+    setLoading(true);
+    try {
+      const next = await creatorNotificationService.list();
+      setNotifications((current) => {
+        const known = new Set(current.map((item) => item.id));
+        const freshUnread = next.filter((item) => !item.read && !known.has(item.id));
+        if (freshUnread.length > 0) {
+          setToasts((toasts) => [...freshUnread, ...toasts].slice(0, 4));
+        }
+        return next;
+      });
+      setUnreadCount(next.filter((item) => !item.read).length);
+    } catch (error) {
+      console.error("Failed to refresh Creator Program notifications:", error);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   const markAsRead = useCallback(async (id: string) => {
+    await creatorNotificationService.markRead(id);
     setNotifications((current) =>
       current.map((notification) =>
         notification.id === id ? { ...notification, read: true } : notification,
@@ -71,6 +95,7 @@ export function CreatorNotificationProvider({
   }, []);
 
   const markAllAsRead = useCallback(async () => {
+    await creatorNotificationService.markAllRead();
     setNotifications((current) =>
       current.map((notification) => ({ ...notification, read: true })),
     );
@@ -78,6 +103,7 @@ export function CreatorNotificationProvider({
   }, []);
 
   const removeNotification = useCallback(async (id: string) => {
+    await creatorNotificationService.remove(id);
     setNotifications((current) => {
       const removed = current.find((notification) => notification.id === id);
       if (removed && !removed.read) {
@@ -89,6 +115,7 @@ export function CreatorNotificationProvider({
   }, []);
 
   const clearAllNotifications = useCallback(async () => {
+    await creatorNotificationService.clearAll();
     setNotifications([]);
     setUnreadCount(0);
     setToasts([]);
@@ -102,6 +129,28 @@ export function CreatorNotificationProvider({
     preloadEarningsNotificationSound();
     setupEarningsNotificationSoundUnlock();
   }, []);
+
+  useEffect(() => {
+    const refresh = () => void refreshNotifications();
+    const clear = () => {
+      setNotifications([]);
+      setUnreadCount(0);
+      setToasts([]);
+    };
+
+    window.addEventListener('cto-authenticated', refresh);
+    window.addEventListener('cto-logged-out', clear);
+    window.addEventListener('focus', refresh);
+    if (getAuthToken()) refresh();
+    const interval = window.setInterval(refresh, 30_000);
+
+    return () => {
+      window.removeEventListener('cto-authenticated', refresh);
+      window.removeEventListener('cto-logged-out', clear);
+      window.removeEventListener('focus', refresh);
+      window.clearInterval(interval);
+    };
+  }, [refreshNotifications]);
 
   return (
     <CreatorNotificationContext.Provider

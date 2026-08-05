@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { usePrivy } from "@privy-io/react-auth";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { privyService } from "@/services/privyService";
 import { authService } from "@/services/authService";
@@ -22,6 +22,7 @@ import { getAuthToken } from "@/lib/authSession";
 import { profileKeys } from "@/lib/queryKeys";
 import { bindSessionStoreListeners, useSessionStore } from "@/lib/sessionStore";
 import type { User } from "@/types/auth.types";
+import { captureReferralCodeFromLocation } from "@/lib/referralAttribution";
 
 const DEFAULT_LOGIN_REDIRECT = "/creator";
 const processingUserIds = new Set<string>();
@@ -29,6 +30,7 @@ const processingUserIds = new Set<string>();
 /** Set when user initiates login; cleared after redirect or failure. */
 let pendingLoginRedirect: string | null = null;
 let activeSessionSync: Promise<void> | null = null;
+let activeHandoffExchange: Promise<User> | null = null;
 let manualLoginInProgress = false;
 
 type LoginOptions = {
@@ -65,14 +67,17 @@ export function PrivyAuthProvider({ children }: { children: ReactNode }) {
 
   const queryClient = useQueryClient();
   const router = useRouter();
+  const pathname = usePathname();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [handoffPending, setHandoffPending] = useState(true);
   const [userData, setUserData] = useState<PrivyAuthContextValue["userData"]>(
     null,
   );
 
   useEffect(() => {
     bindSessionStoreListeners();
+    captureReferralCodeFromLocation();
   }, []);
 
   const applyProfile = useCallback((profile: User) => {
@@ -89,17 +94,45 @@ export function PrivyAuthProvider({ children }: { children: ReactNode }) {
     queryClient.setQueryData(profileKeys.detail(), profile);
   }, [queryClient]);
 
-  const resolveProfile = useCallback(
-    (profilePromise: Promise<User | null>) => {
-      void profilePromise.then((profile) => {
-        if (profile) applyProfile(profile);
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get("handoff");
+    if (!code) {
+      setHandoffPending(false);
+      return;
+    }
+
+    if (!activeHandoffExchange) {
+      activeHandoffExchange = authService.exchangeHandoff(code);
+    }
+    void activeHandoffExchange
+      .then((profile) => {
+        applyProfile(profile);
+        useSessionStore.getState().setToken(getAuthToken());
+        setIsAuthenticated(true);
+        window.dispatchEvent(new Event("cto-authenticated"));
+        router.replace(DEFAULT_LOGIN_REDIRECT);
+      })
+      .catch((error) => {
+        console.error("Session handoff failed:", error);
+      })
+      .finally(() => {
+        activeHandoffExchange = null;
+        setHandoffPending(false);
+        setIsLoading(false);
       });
+  }, [applyProfile, router]);
+
+  const resolveProfile = useCallback(
+    async (profilePromise: Promise<User | null>) => {
+      const profile = await profilePromise;
+      if (profile) applyProfile(profile);
+      return profile;
     },
     [applyProfile],
   );
 
   const hydrateProfile = useCallback(() => {
-    resolveProfile(fetchProfileWithRetry());
+    void resolveProfile(fetchProfileWithRetry());
   }, [resolveProfile]);
 
   const establishSession = useCallback(async (): Promise<{
@@ -107,12 +140,12 @@ export function PrivyAuthProvider({ children }: { children: ReactNode }) {
   } | null> => {
     if (getAuthToken()) {
       setIsAuthenticated(true);
-      return { profilePromise: null };
+      return { profilePromise: fetchProfileWithRetry() };
     }
 
     if (activeSessionSync) {
       await activeSessionSync;
-      return { profilePromise: null };
+      return { profilePromise: fetchProfileWithRetry() };
     }
 
     let profilePromise: Promise<User | null> = Promise.resolve(null);
@@ -134,25 +167,36 @@ export function PrivyAuthProvider({ children }: { children: ReactNode }) {
   }, [getAccessToken]);
 
   const finishPendingRedirect = useCallback(() => {
-    if (!pendingLoginRedirect || !getAuthToken()) return;
-    const path = pendingLoginRedirect;
+    if (!getAuthToken()) return;
+    window.dispatchEvent(new Event("cto-authenticated"));
+    const publicAuthPaths = new Set([
+      "/",
+      "/login",
+      "/creator/login",
+      "/creator/signup",
+      "/creator-signup",
+    ]);
+    const path = pendingLoginRedirect ??
+      (publicAuthPaths.has(pathname) ? DEFAULT_LOGIN_REDIRECT : null);
     pendingLoginRedirect = null;
-    router.push(path);
-  }, [router]);
+    if (path) router.replace(path);
+  }, [pathname, router]);
 
   useEffect(() => {
-    if (!isAuthenticated || !getAuthToken() || !pendingLoginRedirect) return;
+    if (!isAuthenticated || !getAuthToken()) return;
     finishPendingRedirect();
   }, [isAuthenticated, finishPendingRedirect]);
 
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || handoffPending) return;
 
     const token = getAuthToken();
     if (token) {
       setIsAuthenticated(true);
       setIsLoading(false);
       useSessionStore.getState().hydrateFromStorage();
+      hydrateProfile();
+      finishPendingRedirect();
       return;
     }
 
@@ -163,7 +207,7 @@ export function PrivyAuthProvider({ children }: { children: ReactNode }) {
         useSessionStore.getState().clear();
       }
     }
-  }, [ready, authenticated]);
+  }, [ready, authenticated, handoffPending, finishPendingRedirect, hydrateProfile]);
 
   useEffect(() => {
     if (!ready || !authenticated || !user || manualLoginInProgress) return;
@@ -173,10 +217,13 @@ export function PrivyAuthProvider({ children }: { children: ReactNode }) {
 
     const existingToken = getAuthToken();
     if (existingToken) {
-      setIsAuthenticated(true);
-      setIsLoading(false);
-      hydrateProfile();
-      finishPendingRedirect();
+      void (async () => {
+        setIsLoading(true);
+        setIsAuthenticated(true);
+        await resolveProfile(fetchProfileWithRetry());
+        finishPendingRedirect();
+        setIsLoading(false);
+      })();
       return;
     }
 
@@ -186,7 +233,7 @@ export function PrivyAuthProvider({ children }: { children: ReactNode }) {
       try {
         setIsLoading(true);
         const session = await establishSession();
-        if (session?.profilePromise) resolveProfile(session.profilePromise);
+        if (session?.profilePromise) await resolveProfile(session.profilePromise);
         finishPendingRedirect();
       } catch (error) {
         console.error("Authentication flow failed:", error);
@@ -217,17 +264,20 @@ export function PrivyAuthProvider({ children }: { children: ReactNode }) {
       manualLoginInProgress = true;
 
       try {
-        await privyLogin({ loginMethods: ["email"] });
+        if (!authenticated) {
+          await privyLogin({ loginMethods: ["email", "wallet", "google"] });
+        }
         const session = await establishSession();
-        if (session?.profilePromise) resolveProfile(session.profilePromise);
+        if (session?.profilePromise) await resolveProfile(session.profilePromise);
         setIsAuthenticated(true);
-        router.push(redirectTo);
         pendingLoginRedirect = null;
+        window.dispatchEvent(new Event("cto-authenticated"));
+        router.replace(redirectTo);
       } finally {
         manualLoginInProgress = false;
       }
     },
-    [privyLogin, establishSession, resolveProfile, router],
+    [authenticated, privyLogin, establishSession, resolveProfile, router],
   );
 
   const logout = useCallback(async () => {
@@ -245,6 +295,7 @@ export function PrivyAuthProvider({ children }: { children: ReactNode }) {
 
       setIsAuthenticated(false);
       useSessionStore.getState().clear();
+      window.dispatchEvent(new Event("cto-logged-out"));
 
       router.replace("/");
     } catch (error) {
@@ -257,6 +308,7 @@ export function PrivyAuthProvider({ children }: { children: ReactNode }) {
       }
       setIsAuthenticated(false);
       useSessionStore.getState().clear();
+      window.dispatchEvent(new Event("cto-logged-out"));
       router.replace("/");
       throw error;
     }
@@ -267,7 +319,7 @@ export function PrivyAuthProvider({ children }: { children: ReactNode }) {
       user,
       userData,
       isAuthenticated,
-      isLoading: isLoading || !ready,
+      isLoading: isLoading || !ready || handoffPending,
       ready,
       login,
       logout,
@@ -278,6 +330,7 @@ export function PrivyAuthProvider({ children }: { children: ReactNode }) {
       userData,
       isAuthenticated,
       isLoading,
+      handoffPending,
       ready,
       login,
       logout,

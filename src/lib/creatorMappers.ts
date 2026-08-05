@@ -144,13 +144,31 @@ export function mapToPayoutsData(
 
 function mapReferralItem(raw: unknown): Referral {
   const row = toRecord(raw);
+  const referredUser = toRecord(row.referredUser);
+  const wallets = Array.isArray(referredUser.wallets)
+    ? referredUser.wallets.map(toRecord)
+    : [];
+  const wallet = wallets.find((item) => item.isPrimary === true) ?? wallets[0];
+  const email = typeof referredUser.email === "string" ? referredUser.email : "";
+  const username =
+    (typeof referredUser.name === "string" && referredUser.name.trim()) ||
+    email.split("@")[0] ||
+    (typeof row.username === "string" ? row.username : undefined);
+  const status = String(row.status ?? "").toUpperCase();
   return {
     id: String(row.id ?? row.referralId ?? row.userId ?? ""),
-    username: typeof row.username === "string" ? row.username : undefined,
-    wallet: String(row.wallet ?? row.walletAddress ?? ""),
-    dateJoined: String(row.dateJoined ?? row.createdAt ?? row.joinedAt ?? ""),
-    status: row.status === "inactive" ? "inactive" : "active",
-    generated: asNumber(row.generated ?? row.totalGenerated ?? row.earnings),
+    username,
+    wallet: String(row.wallet ?? row.walletAddress ?? wallet?.address ?? ""),
+    dateJoined: String(
+      row.dateJoined ?? row.signedUpAt ?? row.createdAt ?? row.joinedAt ?? referredUser.createdAt ?? "",
+    ),
+    status:
+      row.isActive === false || status === "INACTIVE" || status === "PENDING"
+        ? "inactive"
+        : "active",
+    generated: asNumber(
+      row.generated ?? row.totalGenerated ?? row.totalEarned ?? row.earnings,
+    ),
   };
 }
 
@@ -168,22 +186,14 @@ export function mapProfileToSettings(
   profile: User,
   account?: CreatorMeResponse["account"],
 ): CreatorSettingsData {
-  const authWallets = mapAuthWalletsToPayoutWallets(profile.wallets);
-  const payoutWallet = account?.payoutWalletAddress ?? undefined;
-  const fallbackWallets: PayoutWallet[] = payoutWallet
-    ? [
-        {
-          chain: "solana",
-          address: payoutWallet,
-          label: "Solana USDC",
-        },
-      ]
-    : [];
-
   return {
     username: profile.name?.trim() || profile.email.split("@")[0] || "Creator",
     email: profile.email,
     profileImageUrl: profile.avatarUrl ?? undefined,
-    wallets: authWallets.length > 0 ? authWallets : fallbackWallets,
+    wallets: (profile.wallets ?? []).map((wallet) => ({
+      chain: wallet.blockchain.toLowerCase(),
+      address: wallet.address,
+      label: `${wallet.blockchain} wallet`,
+    })),
   };
 }

@@ -13,7 +13,9 @@ export function formatCurrency(amount: number): string {
 }
 
 export function formatDate(dateStr: string): string {
+  if (!dateStr) return "Unavailable";
   const date = new Date(dateStr);
+  if (Number.isNaN(date.getTime())) return "Unavailable";
   return date.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
@@ -22,7 +24,9 @@ export function formatDate(dateStr: string): string {
 }
 
 export function formatDateTime(dateStr: string): string {
+  if (!dateStr) return "Unavailable";
   const date = new Date(dateStr);
+  if (Number.isNaN(date.getTime())) return "Unavailable";
   const datePart = date.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
