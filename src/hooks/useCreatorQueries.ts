@@ -11,6 +11,7 @@ import {
   mapToReferralsData,
 } from "@/lib/creatorMappers";
 import { creatorService } from "@/services/creatorService";
+import { authService } from "@/services/authService";
 import type { CreatorMeResponse } from "@/types/creatorBackend";
 
 function isQueryEnabled(enabled?: boolean) {
@@ -59,11 +60,12 @@ export function useCreatorPayoutsQuery(limit?: number | string, enabled?: boolea
   return useQuery({
     queryKey: creatorKeys.payouts(limit),
     queryFn: async ({ signal }) => {
-      const [me, payouts] = await Promise.all([
+      const [me, payouts, profile] = await Promise.all([
         creatorService.getMe(undefined, signal),
         creatorService.getPayouts(limit, signal),
+        authService.fetchProfile(signal, { clearSessionOn401: false }),
       ]);
-      return mapToPayoutsData(me, payouts);
+      return mapToPayoutsData(me, payouts, profile);
     },
     enabled: isQueryEnabled(enabled),
     staleTime: 60_000,

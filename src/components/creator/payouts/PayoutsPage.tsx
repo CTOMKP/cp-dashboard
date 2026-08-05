@@ -66,7 +66,9 @@ export default function PayoutsPage() {
   const isPending = isWalletChangePending(
     walletChange?.walletChangePendingUntil,
   );
-  const activePayoutWallet = data ? getActivePayoutWallet(data) : "";
+  const activePayoutWallet = data
+    ? getActivePayoutWallet(data, selectedChain)
+    : "";
 
   useEffect(() => {
     if (!isPending || !walletChange?.walletChangePendingUntil) {
@@ -181,8 +183,8 @@ export default function PayoutsPage() {
               {activeChain.walletLabel}
             </label>
             <p className="mb-3 text-xs text-creator-text-secondary">
-              This is your payout wallet from Settings. Update it there if you
-              need to make a change.
+              This wallet comes from your connected account wallets. Update it
+              in Settings if you need to make a change.
             </p>
 
             {isPending && (

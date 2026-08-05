@@ -12,6 +12,7 @@ export const WALLET_ID_KEY = "cto_wallet_id";
 export const WALLET_ADDRESS_KEY = "cto_wallet_address";
 export const USER_AVATAR_URL_KEY = "cto_user_avatar_url";
 export const PROFILE_AVATAR_URL_KEY = "profile_avatar_url";
+export const PROFILE_AVATAR_META_KEY = "profile_avatar_meta";
 export const GENERIC_WALLETS_KEY = "cto_user_wallets";
 export const LEGACY_CTO_TOKEN_KEY = "cto_token";
 export const LEGACY_CTO_USER_KEY = "cto_user";
@@ -63,6 +64,7 @@ export function clearSessionStorage(): void {
   ls.removeItem(WALLET_ADDRESS_KEY);
   ls.removeItem(USER_AVATAR_URL_KEY);
   ls.removeItem(PROFILE_AVATAR_URL_KEY);
+  ls.removeItem(PROFILE_AVATAR_META_KEY);
   ls.removeItem(GENERIC_WALLETS_KEY);
   ls.removeItem(LEGACY_CTO_TOKEN_KEY);
   ls.removeItem(LEGACY_CTO_USER_KEY);

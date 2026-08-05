@@ -97,12 +97,19 @@ export interface WalletChangeState {
   nextWalletChangeAllowed?: string;
 }
 
+export interface PayoutWallet {
+  chain: PayoutChainId;
+  address: string;
+  label: string;
+}
+
 export interface PayoutsData {
   availableBalance: number;
   totalPaidOut: number;
   savedWalletAddress?: string;
   savedChain?: PayoutChainId;
   walletChange?: WalletChangeState;
+  wallets: PayoutWallet[];
   payouts: PayoutRecord[];
 }
 
@@ -114,11 +121,7 @@ export interface CreatorSettingsData {
   accountDeactivated?: boolean;
   deactivatedAt?: string;
   walletChange?: WalletChangeState;
-  wallets: {
-    chain: PayoutChainId;
-    address: string;
-    label: string;
-  }[];
+  wallets: PayoutWallet[];
 }
 
 export interface ReferralCodeData {

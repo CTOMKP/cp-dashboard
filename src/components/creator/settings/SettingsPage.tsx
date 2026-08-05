@@ -14,9 +14,16 @@ import {
   Wallet,
 } from "lucide-react";
 import { authService } from "@/services/authService";
+import { pfpService } from "@/services/pfpService";
 import { useQueryClient } from "@tanstack/react-query";
 import { profileKeys } from "@/lib/queryKeys";
 import { useCreatorProfile } from "@/contexts/CreatorProfileContext";
+import {
+  PROFILE_AVATAR_META_KEY,
+  PROFILE_AVATAR_URL_KEY,
+  USER_AVATAR_URL_KEY,
+} from "@/lib/authSession";
+import { useSessionStore } from "@/lib/sessionStore";
 import { maskEmail, truncateWallet, formatDate } from "@/lib/format";
 import {
   getDefaultPayoutChain,
@@ -37,9 +44,14 @@ export default function SettingsPage() {
   const queryClient = useQueryClient();
   const { profile, updateProfile, refreshProfile, loading: profileLoading } =
     useCreatorProfile();
+  const sessionUserId = useSessionStore((state) => state.userId);
+  const sessionEmail = useSessionStore((state) => state.email);
+  const setAvatarUrl = useSessionStore((state) => state.setAvatarUrl);
   const [data, setData] = useState<CreatorSettingsData | null>(null);
   const [username, setUsername] = useState("");
   const [profilePreview, setProfilePreview] = useState<string | undefined>();
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
@@ -169,12 +181,48 @@ export default function SettingsPage() {
     }
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => setProfilePreview(reader.result as string);
-    reader.readAsDataURL(file);
+
+    const userId = sessionUserId || sessionEmail || data?.email || "";
+    if (!userId) {
+      setAvatarError("Please log in to update your profile picture.");
+      e.target.value = "";
+      return;
+    }
+
+    setAvatarError(null);
+    setAvatarUploading(true);
+
+    try {
+      const { viewUrl, key } = await pfpService.uploadProfileImage(file, userId);
+      const updated = await authService.updateUser({ avatarUrl: viewUrl });
+
+      localStorage.setItem(USER_AVATAR_URL_KEY, viewUrl);
+      localStorage.setItem(PROFILE_AVATAR_URL_KEY, viewUrl);
+      if (key) {
+        localStorage.setItem(PROFILE_AVATAR_META_KEY, JSON.stringify({ key }));
+      }
+
+      const nextImageUrl = updated.avatarUrl ?? viewUrl;
+      setAvatarUrl(nextImageUrl);
+      setProfilePreview(nextImageUrl);
+      setData((current) =>
+        current ? { ...current, profileImageUrl: nextImageUrl } : current,
+      );
+      updateProfile({ profileImageUrl: nextImageUrl });
+      window.dispatchEvent(new Event("avatarUpdated"));
+      await queryClient.invalidateQueries({ queryKey: profileKeys.all });
+      await refreshProfile();
+    } catch (err) {
+      setAvatarError(
+        err instanceof Error ? err.message : "Failed to upload profile picture",
+      );
+    } finally {
+      setAvatarUploading(false);
+      e.target.value = "";
+    }
   };
 
   const handleSaveProfile = async () => {
@@ -187,10 +235,6 @@ export default function SettingsPage() {
     try {
       const updated = await authService.updateUser({
         name: data?.usernameLocked ? data.username : username.trim(),
-        avatarUrl:
-          profilePreview && !profilePreview.startsWith("data:")
-            ? profilePreview
-            : undefined,
       });
       const nextSettings: CreatorSettingsData = {
         ...(data ?? {
@@ -301,7 +345,7 @@ export default function SettingsPage() {
 
         <div className="mt-6 flex flex-col gap-6 sm:flex-row sm:items-center">
           <div className="relative">
-            <div className="h-24 w-24 overflow-hidden rounded-full border border-creator-border bg-gradient-to-br from-[#ff007a] via-[#ff8c00] to-[#ffc107]">
+            <div className="relative h-24 w-24 overflow-hidden rounded-full border border-creator-border bg-gradient-to-br from-[#ff007a] via-[#ff8c00] to-[#ffc107]">
               {(profilePreview ?? profile?.profileImageUrl) ? (
                 <img
                   src={profilePreview ?? profile?.profileImageUrl}
@@ -313,11 +357,17 @@ export default function SettingsPage() {
                   {username.charAt(0).toUpperCase() || "C"}
                 </div>
               )}
+              {avatarUploading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                  <Loader2 className="h-6 w-6 animate-spin text-white" />
+                </div>
+              )}
             </div>
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="absolute bottom-0 right-0 rounded-full border border-creator-border bg-creator-card p-2 text-creator-text-primary transition-colors hover:border-creator-accent"
+              disabled={avatarUploading}
+              className="absolute bottom-0 right-0 rounded-full border border-creator-border bg-creator-card p-2 text-creator-text-primary transition-colors hover:border-creator-accent disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Camera className="h-4 w-4" />
             </button>
@@ -326,7 +376,7 @@ export default function SettingsPage() {
               type="file"
               accept="image/*"
               className="hidden"
-              onChange={handleImageChange}
+              onChange={(e) => void handleImageChange(e)}
             />
           </div>
 
@@ -353,6 +403,12 @@ export default function SettingsPage() {
             )}
           </div>
         </div>
+
+        {avatarError && (
+          <p className="mt-4 text-sm text-[var(--color-creator-danger)]">
+            {avatarError}
+          </p>
+        )}
 
         {profileError && (
           <p className="mt-4 text-sm text-[var(--color-creator-danger)]">

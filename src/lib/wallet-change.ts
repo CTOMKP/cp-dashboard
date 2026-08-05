@@ -13,14 +13,24 @@ export function canChangeWallet(nextAllowed?: string): boolean {
   return new Date(nextAllowed).getTime() <= Date.now();
 }
 
-export function getActivePayoutWallet(data: PayoutsData): string {
+export function getActivePayoutWallet(
+  data: PayoutsData,
+  chain: PayoutChainId = "solana",
+): string {
   if (
     data.walletChange?.pendingWalletAddress &&
     isWalletChangePending(data.walletChange.walletChangePendingUntil)
   ) {
     return data.walletChange.activeWalletAddress;
   }
-  return data.savedWalletAddress ?? data.walletChange?.activeWalletAddress ?? "";
+
+  const chainWallet = data.wallets.find((wallet) => wallet.chain === chain)?.address;
+  return (
+    chainWallet ??
+    data.savedWalletAddress ??
+    data.walletChange?.activeWalletAddress ??
+    ""
+  );
 }
 
 export function getTimeRemaining(targetIso: string) {

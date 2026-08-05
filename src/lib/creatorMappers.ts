@@ -1,4 +1,8 @@
 import { toRecord } from "@/lib/apiResponse";
+import {
+  getAuthWalletAddressForChain,
+  mapAuthWalletsToPayoutWallets,
+} from "@/lib/authWallets";
 import type {
   CreatorEarningsListResponse,
   CreatorMeResponse,
@@ -16,6 +20,7 @@ import type {
   PayoutChainId,
   PayoutRecord,
   PayoutsData,
+  PayoutWallet,
   Referral,
   ReferralCodeData,
 } from "@/types/creator";
@@ -107,14 +112,33 @@ function mapPayoutItem(raw: unknown): PayoutRecord {
 export function mapToPayoutsData(
   me: CreatorMeResponse,
   list: CreatorPayoutsListResponse,
+  profile?: User,
 ): PayoutsData {
-  const wallet = me.account.payoutWalletAddress ?? undefined;
+  const authWallets = mapAuthWalletsToPayoutWallets(profile?.wallets);
+  const fallbackWallet = me.account.payoutWalletAddress ?? undefined;
+  const fallbackWallets: PayoutWallet[] = fallbackWallet
+    ? [
+        {
+          chain: "solana",
+          address: fallbackWallet,
+          label: "Solana USDC",
+        },
+      ]
+    : [];
+  const wallets = authWallets.length > 0 ? authWallets : fallbackWallets;
+  const savedChain = wallets[0]?.chain ?? "solana";
+
   return {
     availableBalance: me.account.pendingBalance,
     totalPaidOut: me.account.paidBalance,
-    savedWalletAddress: wallet,
-    savedChain: "solana",
-    payouts: (list.payouts ?? me.payouts ?? []).map(mapPayoutItem).filter((item) => item.id || item.dateRequested),
+    savedWalletAddress:
+      getAuthWalletAddressForChain(profile?.wallets, savedChain) ??
+      fallbackWallet,
+    savedChain,
+    wallets,
+    payouts: (list.payouts ?? me.payouts ?? [])
+      .map(mapPayoutItem)
+      .filter((item) => item.id || item.dateRequested),
   };
 }
 
@@ -144,19 +168,22 @@ export function mapProfileToSettings(
   profile: User,
   account?: CreatorMeResponse["account"],
 ): CreatorSettingsData {
+  const authWallets = mapAuthWalletsToPayoutWallets(profile.wallets);
   const payoutWallet = account?.payoutWalletAddress ?? undefined;
+  const fallbackWallets: PayoutWallet[] = payoutWallet
+    ? [
+        {
+          chain: "solana",
+          address: payoutWallet,
+          label: "Solana USDC",
+        },
+      ]
+    : [];
+
   return {
     username: profile.name?.trim() || profile.email.split("@")[0] || "Creator",
     email: profile.email,
     profileImageUrl: profile.avatarUrl ?? undefined,
-    wallets: payoutWallet
-      ? [
-          {
-            chain: "solana",
-            address: payoutWallet,
-            label: "Solana USDC",
-          },
-        ]
-      : [],
+    wallets: authWallets.length > 0 ? authWallets : fallbackWallets,
   };
 }
