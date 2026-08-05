@@ -24,7 +24,6 @@ import ErrorState from "@/components/creator/ui/ErrorState";
 import { useCreatorPayoutsQuery } from "@/hooks/useCreatorQueries";
 import { useRequestPayoutMutation } from "@/hooks/mutations/useRequestPayoutMutation";
 import { isApiError } from "@/lib/apiError";
-import { useCreatorProfile } from "@/contexts/CreatorProfileContext";
 
 const MIN_PAYOUT = 10;
 
@@ -48,7 +47,6 @@ function statusVariant(
 export default function PayoutsPage() {
   const { data, isLoading, error, refetch } = useCreatorPayoutsQuery();
   const requestPayoutMutation = useRequestPayoutMutation();
-  const { profile } = useCreatorProfile();
   const [selectedChain, setSelectedChain] = useState<PayoutChainId>("solana");
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [countdown, setCountdown] = useState("");
@@ -68,12 +66,14 @@ export default function PayoutsPage() {
   const isPending = isWalletChangePending(
     walletChange?.walletChangePendingUntil,
   );
-  const solanaWallet = profile?.wallets?.find(
-    (wallet) => wallet.chain.toUpperCase() === "SOLANA",
+  const selectedWallet = data?.wallets.find(
+    (wallet) => wallet.chain === selectedChain,
   );
-  const activePayoutWallet = data
-    ? getActivePayoutWallet(data) || solanaWallet?.address || ""
-    : solanaWallet?.address || "";
+  const activePayoutWallet =
+    selectedWallet?.address ||
+    (data && selectedChain === "solana"
+      ? getActivePayoutWallet(data, "solana")
+      : "");
 
   useEffect(() => {
     if (!isPending || !walletChange?.walletChangePendingUntil) {
@@ -119,6 +119,7 @@ export default function PayoutsPage() {
       await requestPayoutMutation.mutateAsync({
         walletAddress: activePayoutWallet,
         amount: data.availableBalance,
+        chain: selectedChain,
       });
     } catch (err) {
       setSubmitError(
@@ -263,7 +264,7 @@ export default function PayoutsPage() {
             )}
 
             <p className="text-xs text-creator-text-secondary">
-              Payouts are processed manually and sent on Solana in USDC.
+              Payouts are processed manually and sent in USDC on the selected network.
               Processing time: 1–3 business days.
             </p>
           </>
@@ -300,7 +301,7 @@ export default function PayoutsPage() {
                 </div>
                 <div className="flex flex-wrap items-center gap-2 text-xs text-creator-text-secondary">
                   <Badge variant="teal">
-                    {payout.chain === "solana" ? "Solana USDC" : "Base USDC"}
+                    {payout.chain === "solana" ? "Solana USDC" : "Ethereum USDC"}
                   </Badge>
                   <span className="font-mono">
                     {truncateWallet(payout.wallet)}
@@ -342,7 +343,7 @@ export default function PayoutsPage() {
                     </td>
                     <td className="px-4 py-3">
                       <Badge variant="teal">
-                        {payout.chain === "solana" ? "Solana USDC" : "Base USDC"}
+                        {payout.chain === "solana" ? "Solana USDC" : "Ethereum USDC"}
                       </Badge>
                     </td>
                     <td className="px-4 py-3 font-mono text-xs text-creator-text-secondary">

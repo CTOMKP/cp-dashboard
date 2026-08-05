@@ -8,9 +8,11 @@ import DashboardPreview from "@/components/DashboardPreview";
 import FAQ from "@/components/FAQ";
 import FinalCTA from "@/components/FinalCTA";
 import Footer from "@/components/Footer";
+import LandingGate from "@/components/LandingGate";
 
 export default function Home() {
   return (
+    <LandingGate>
     <main className="relative min-h-screen bg-[#0A0A0A]">
       {/* Persistent ambient background */}
       <div className="pointer-events-none fixed inset-0 z-0" aria-hidden>
@@ -32,5 +34,6 @@ export default function Home() {
         <Footer />
       </div>
     </main>
+    </LandingGate>
   );
 }

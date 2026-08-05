@@ -1,4 +1,4 @@
-export type PayoutChainId = "solana" | "base";
+export type PayoutChainId = "solana" | "ethereum";
 
 export interface PayoutChain {
   id: PayoutChainId;
@@ -25,15 +25,14 @@ export const PAYOUT_CHAINS: PayoutChain[] = [
     enabled: true,
   },
   {
-    id: "base",
-    name: "Base",
-    token: "USDC",
-    description: "Receive payouts as USDC on Base",
-    walletLabel: "Base USDC Wallet Address",
+    id: "ethereum",
+    name: "Ethereum",
+    token: "Ethereum USDC",
+    description: "Receive payouts as USDC on Ethereum",
+    walletLabel: "Ethereum USDC Wallet Address",
     walletPlaceholder: "e.g. 0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
-    walletHint: "Base payouts will be available soon.",
-    enabled: false,
-    comingSoon: true,
+    walletHint: "Uses the Ethereum wallet connected to your CTO account.",
+    enabled: true,
   },
 ];
 

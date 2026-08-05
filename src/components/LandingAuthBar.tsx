@@ -10,8 +10,14 @@ export default function LandingAuthBar() {
 
   return (
     <div className="inline-flex items-stretch overflow-hidden rounded-xl border border-[#222222] bg-[#111111]/95 text-sm font-semibold shadow-lg backdrop-blur-md">
-      {!authResolved ? (
-        <span className="inline-flex h-[42px] w-[88px] items-center justify-center px-4" aria-hidden />
+      {!ready ? (
+        <span className="inline-flex h-[42px] items-center justify-center px-4 text-[#888888]">
+          Loading…
+        </span>
+      ) : !authResolved ? (
+        <span className="inline-flex h-[42px] items-center justify-center px-4 text-[#888888]">
+          Signing in…
+        </span>
       ) : isAuthenticated ? (
         <Link
           href="/creator"

@@ -48,5 +48,5 @@ export function formatCountdown(targetIso: string): string {
 }
 
 export function chainDisplayName(chain: PayoutChainId): string {
-  return chain === "solana" ? "Solana USDC" : "Base USDC";
+  return chain === "solana" ? "Solana USDC" : "Ethereum USDC";
 }

@@ -30,7 +30,7 @@ const processingUserIds = new Set<string>();
 /** Set when user initiates login; cleared after redirect or failure. */
 let pendingLoginRedirect: string | null = null;
 let activeSessionSync: Promise<void> | null = null;
-let activeHandoffExchange: Promise<User> | null = null;
+let activeHandoffExchange: Promise<void> | null = null;
 let manualLoginInProgress = false;
 
 type LoginOptions = {
@@ -105,15 +105,18 @@ export function PrivyAuthProvider({ children }: { children: ReactNode }) {
       activeHandoffExchange = authService.exchangeHandoff(code);
     }
     void activeHandoffExchange
-      .then((profile) => {
-        applyProfile(profile);
+      .then(() => {
         useSessionStore.getState().setToken(getAuthToken());
         setIsAuthenticated(true);
         window.dispatchEvent(new Event("cto-authenticated"));
         router.replace(DEFAULT_LOGIN_REDIRECT);
+        void fetchProfileWithRetry().then((profile) => {
+          if (profile) applyProfile(profile);
+        });
       })
       .catch((error) => {
         console.error("Session handoff failed:", error);
+        router.replace("/");
       })
       .finally(() => {
         activeHandoffExchange = null;
@@ -233,8 +236,8 @@ export function PrivyAuthProvider({ children }: { children: ReactNode }) {
       try {
         setIsLoading(true);
         const session = await establishSession();
-        if (session?.profilePromise) await resolveProfile(session.profilePromise);
         finishPendingRedirect();
+        if (session?.profilePromise) void resolveProfile(session.profilePromise);
       } catch (error) {
         console.error("Authentication flow failed:", error);
         setIsAuthenticated(!!getAuthToken());
@@ -268,11 +271,11 @@ export function PrivyAuthProvider({ children }: { children: ReactNode }) {
           await privyLogin({ loginMethods: ["email", "wallet", "google"] });
         }
         const session = await establishSession();
-        if (session?.profilePromise) await resolveProfile(session.profilePromise);
         setIsAuthenticated(true);
         pendingLoginRedirect = null;
         window.dispatchEvent(new Event("cto-authenticated"));
         router.replace(redirectTo);
+        if (session?.profilePromise) void resolveProfile(session.profilePromise);
       } finally {
         manualLoginInProgress = false;
       }

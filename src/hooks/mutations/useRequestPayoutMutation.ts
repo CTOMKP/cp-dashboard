@@ -11,6 +11,7 @@ export function useRequestPayoutMutation() {
     mutationFn: (body: {
       walletAddress: string;
       amount: number;
+      chain: "solana" | "ethereum";
       note?: string;
     }) => creatorService.requestPayout(body),
     onSuccess: async () => {

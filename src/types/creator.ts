@@ -8,7 +8,7 @@ export type EarningStatus = "paid" | "pending";
 
 export type PayoutStatus = "pending" | "approved" | "paid" | "rejected";
 
-export type PayoutChainId = "solana" | "base";
+export type PayoutChainId = "solana" | "ethereum";
 
 export interface EarningsDataPoint {
   date: string;

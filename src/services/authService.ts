@@ -70,7 +70,7 @@ class AuthService {
     return profile;
   }
 
-  async exchangeHandoff(code: string): Promise<User> {
+  async exchangeHandoff(code: string): Promise<void> {
     const body = await apiPost<unknown>(
       "/api/v1/auth/handoff/exchange",
       { code, target: "creator" },
@@ -82,7 +82,6 @@ class AuthService {
       throw new Error("Session handoff response is missing an access token.");
     }
     setAuthToken(token);
-    return this.fetchProfile(undefined, { clearSessionOn401: false });
   }
 
   async updateUser(

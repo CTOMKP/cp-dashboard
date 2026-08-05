@@ -65,6 +65,7 @@ export const creatorService = {
     body: {
       walletAddress: string;
       amount: number;
+      chain: "solana" | "ethereum";
       note?: string;
     },
     signal?: AbortSignal,

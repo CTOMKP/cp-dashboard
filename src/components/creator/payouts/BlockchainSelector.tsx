@@ -39,8 +39,7 @@ export default function BlockchainSelector({
           Select Blockchain
         </label>
         <p className="mt-1 text-xs text-creator-text-secondary">
-          Choose where you want to receive your Solana USDC payout. More
-          networks will be added soon.
+          Choose the network where you want to receive your USDC payout.
         </p>
       </div>
 

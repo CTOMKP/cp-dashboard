@@ -7,7 +7,7 @@ export function blockchainToPayoutChain(
 ): PayoutChainId | null {
   const normalized = blockchain.toLowerCase();
   if (normalized.includes("solana")) return "solana";
-  if (normalized.includes("base")) return "base";
+  if (normalized.includes("ethereum")) return "ethereum";
   return null;
 }
 

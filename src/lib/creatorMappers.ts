@@ -38,7 +38,7 @@ function asNumber(value: unknown, fallback = 0): number {
 }
 
 function asChain(value: unknown): PayoutChainId {
-  return value === "base" ? "base" : "solana";
+  return value === "ethereum" ? "ethereum" : "solana";
 }
 
 export function mapMeToDashboard(me: CreatorMeResponse): DashboardData {
@@ -93,12 +93,13 @@ export function mapToEarningsData(
 
 function mapPayoutItem(raw: unknown): PayoutRecord {
   const row = toRecord(raw);
+  const metadata = toRecord(row.metadata);
   return {
     id: String(row.id ?? row.payoutId ?? ""),
     dateRequested: String(row.dateRequested ?? row.createdAt ?? row.requestedAt ?? ""),
     amount: asNumber(row.amount),
     wallet: String(row.wallet ?? row.walletAddress ?? ""),
-    chain: asChain(row.chain),
+    chain: asChain(row.chain ?? metadata.chain),
     status:
       row.status === "approved" ||
       row.status === "paid" ||
@@ -126,7 +127,9 @@ export function mapToPayoutsData(
       ]
     : [];
   const wallets = authWallets.length > 0 ? authWallets : fallbackWallets;
-  const savedChain = wallets[0]?.chain ?? "solana";
+  const savedChain = wallets.some((wallet) => wallet.chain === "solana")
+    ? "solana"
+    : wallets[0]?.chain ?? "solana";
 
   return {
     availableBalance: me.account.pendingBalance,
@@ -186,11 +189,21 @@ export function mapProfileToSettings(
   profile: User,
   account?: CreatorMeResponse["account"],
 ): CreatorSettingsData {
+  const wallets = (profile.wallets ?? [])
+    .filter((wallet) => {
+      const chain = wallet.blockchain.toUpperCase();
+      return chain === "ETHEREUM" || chain === "SOLANA";
+    })
+    .sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary));
+  const uniqueWallets = Array.from(
+    new Map(wallets.map((wallet) => [wallet.blockchain.toUpperCase(), wallet])).values(),
+  );
+
   return {
     username: profile.name?.trim() || profile.email.split("@")[0] || "Creator",
     email: profile.email,
     profileImageUrl: profile.avatarUrl ?? undefined,
-    wallets: (profile.wallets ?? []).map((wallet) => ({
+    wallets: uniqueWallets.map((wallet) => ({
       chain: wallet.blockchain.toLowerCase(),
       address: wallet.address,
       label: `${wallet.blockchain} wallet`,

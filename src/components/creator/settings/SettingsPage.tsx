@@ -16,23 +16,13 @@ import { pfpService } from "@/services/pfpService";
 import { useQueryClient } from "@tanstack/react-query";
 import { profileKeys } from "@/lib/queryKeys";
 import { useCreatorProfile } from "@/contexts/CreatorProfileContext";
-import { maskEmail } from "@/lib/format";
 import {
   PROFILE_AVATAR_META_KEY,
   PROFILE_AVATAR_URL_KEY,
   USER_AVATAR_URL_KEY,
 } from "@/lib/authSession";
 import { useSessionStore } from "@/lib/sessionStore";
-import { maskEmail, truncateWallet, formatDate } from "@/lib/format";
-import {
-  getDefaultPayoutChain,
-  isValidSolanaAddress,
-} from "@/lib/payout-chains";
-import {
-  canChangeWallet,
-  formatCountdown,
-  isWalletChangePending,
-} from "@/lib/wallet-change";
+import { maskEmail } from "@/lib/format";
 import type { CreatorSettingsData } from "@/types/creator";
 import ErrorState from "@/components/creator/ui/ErrorState";
 import Badge from "@/components/creator/ui/Badge";
@@ -49,6 +39,7 @@ export default function SettingsPage() {
   const [data, setData] = useState<CreatorSettingsData | null>(null);
   const [username, setUsername] = useState("");
   const [profilePreview, setProfilePreview] = useState<string | undefined>();
+  const [pendingAvatarFile, setPendingAvatarFile] = useState<File | null>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -93,52 +84,21 @@ export default function SettingsPage() {
     setError(null);
     setData(profile);
     setUsername(profile.username);
-    setProfilePreview(profile.profileImageUrl);
+    if (!pendingAvatarFile) {
+      setProfilePreview(profile.profileImageUrl);
+    }
     setLoading(false);
-  }, [profile, profileLoading]);
+  }, [profile, profileLoading, pendingAvatarFile]);
 
-  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    const userId = sessionUserId || sessionEmail || data?.email || "";
-    if (!userId) {
-      setAvatarError("Please log in to update your profile picture.");
-      e.target.value = "";
-      return;
-    }
-
     setAvatarError(null);
-    setAvatarUploading(true);
-
-    try {
-      const { viewUrl, key } = await pfpService.uploadProfileImage(file, userId);
-      const updated = await authService.updateUser({ avatarUrl: viewUrl });
-
-      localStorage.setItem(USER_AVATAR_URL_KEY, viewUrl);
-      localStorage.setItem(PROFILE_AVATAR_URL_KEY, viewUrl);
-      if (key) {
-        localStorage.setItem(PROFILE_AVATAR_META_KEY, JSON.stringify({ key }));
-      }
-
-      const nextImageUrl = updated.avatarUrl ?? viewUrl;
-      setAvatarUrl(nextImageUrl);
-      setProfilePreview(nextImageUrl);
-      setData((current) =>
-        current ? { ...current, profileImageUrl: nextImageUrl } : current,
-      );
-      updateProfile({ profileImageUrl: nextImageUrl });
-      window.dispatchEvent(new Event("avatarUpdated"));
-      await queryClient.invalidateQueries({ queryKey: profileKeys.all });
-      await refreshProfile();
-    } catch (err) {
-      setAvatarError(
-        err instanceof Error ? err.message : "Failed to upload profile picture",
-      );
-    } finally {
-      setAvatarUploading(false);
-      e.target.value = "";
-    }
+    setPendingAvatarFile(file);
+    const reader = new FileReader();
+    reader.onload = () => setProfilePreview(String(reader.result));
+    reader.readAsDataURL(file);
+    e.target.value = "";
   };
 
   const handleSaveProfile = async () => {
@@ -148,9 +108,21 @@ export default function SettingsPage() {
     }
     setSavingProfile(true);
     setProfileError(null);
+    setAvatarError(null);
     try {
+      let avatarUrl = data?.profileImageUrl;
+      let avatarKey: string | undefined;
+      if (pendingAvatarFile) {
+        const userId = sessionUserId || sessionEmail || data?.email || "";
+        if (!userId) throw new Error("Please log in to update your profile picture.");
+        setAvatarUploading(true);
+        const uploaded = await pfpService.uploadProfileImage(pendingAvatarFile, userId);
+        avatarUrl = uploaded.viewUrl;
+        avatarKey = uploaded.key;
+      }
       const updated = await authService.updateUser({
         name: data?.usernameLocked ? data.username : username.trim(),
+        avatarUrl,
       });
       const nextSettings: CreatorSettingsData = {
         ...(data ?? {
@@ -165,7 +137,18 @@ export default function SettingsPage() {
       setData(nextSettings);
       setUsername(nextSettings.username);
       setProfilePreview(nextSettings.profileImageUrl);
+      setPendingAvatarFile(null);
+      if (nextSettings.profileImageUrl) {
+        localStorage.setItem(USER_AVATAR_URL_KEY, nextSettings.profileImageUrl);
+        localStorage.setItem(PROFILE_AVATAR_URL_KEY, nextSettings.profileImageUrl);
+        setAvatarUrl(nextSettings.profileImageUrl);
+      }
+      if (avatarKey) {
+        localStorage.setItem(PROFILE_AVATAR_META_KEY, JSON.stringify({ key: avatarKey }));
+      }
       updateProfile(nextSettings);
+      queryClient.setQueryData(profileKeys.detail(), updated);
+      window.dispatchEvent(new Event("avatarUpdated"));
       await queryClient.invalidateQueries({ queryKey: profileKeys.all });
       await refreshProfile();
       setProfileSaved(true);
@@ -176,6 +159,7 @@ export default function SettingsPage() {
       );
     } finally {
       setSavingProfile(false);
+      setAvatarUploading(false);
     }
   };
 
@@ -292,7 +276,7 @@ export default function SettingsPage() {
               type="file"
               accept="image/*"
               className="hidden"
-              onChange={(e) => void handleImageChange(e)}
+              onChange={handleImageChange}
             />
           </div>
 
@@ -335,7 +319,7 @@ export default function SettingsPage() {
         <button
           type="button"
           onClick={handleSaveProfile}
-          disabled={savingProfile}
+          disabled={savingProfile || avatarUploading}
           className="creator-btn-primary mt-6 inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm"
         >
           {savingProfile ? (
