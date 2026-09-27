@@ -68,14 +68,25 @@ export function mapMeToReferralCode(me: CreatorMeResponse): ReferralCodeData {
 
 function mapEarningItem(raw: unknown): EarningTransaction {
   const row = toRecord(raw);
-  const typeRaw = String(row.type ?? "escrow_deal");
+  const typeRaw = String(row.type ?? row.sourceType ?? "escrow_deal").toLowerCase();
+  const statusRaw = String(row.status ?? "").toLowerCase();
   return {
     id: String(row.id ?? row.earningId ?? ""),
     date: String(row.date ?? row.createdAt ?? ""),
-    type: typeRaw === "ad_fee" ? "ad_fee" : "escrow_deal",
-    dealAmount: asNumber(row.dealAmount ?? row.deal_amount ?? row.amount),
-    yourCut: asNumber(row.yourCut ?? row.your_cut ?? row.creatorCut),
-    status: row.status === "pending" ? "pending" : "paid",
+    type:
+      typeRaw === "ad_fee" || typeRaw === "marketplace_ad"
+        ? "ad_fee"
+        : "escrow_deal",
+    dealAmount: asNumber(
+      row.dealAmount ?? row.deal_amount ?? row.amountGross ?? row.amount,
+    ),
+    yourCut: asNumber(
+      row.yourCut ?? row.your_cut ?? row.amountEarned ?? row.creatorCut,
+    ),
+    status:
+      statusRaw === "pending" || statusRaw === "available" || statusRaw === "held"
+        ? "pending"
+        : "paid",
   };
 }
 
@@ -94,19 +105,25 @@ export function mapToEarningsData(
 function mapPayoutItem(raw: unknown): PayoutRecord {
   const row = toRecord(raw);
   const metadata = toRecord(row.metadata);
+  const status = String(row.status ?? "").toLowerCase();
   return {
     id: String(row.id ?? row.payoutId ?? ""),
     dateRequested: String(row.dateRequested ?? row.createdAt ?? row.requestedAt ?? ""),
-    amount: asNumber(row.amount),
+    amount: asNumber(row.amount ?? row.amountApproved ?? row.amountRequested),
     wallet: String(row.wallet ?? row.walletAddress ?? ""),
     chain: asChain(row.chain ?? metadata.chain),
     status:
-      row.status === "approved" ||
-      row.status === "paid" ||
-      row.status === "rejected"
-        ? row.status
+      status === "approved" || status === "paid" || status === "rejected"
+        ? status
         : "pending",
-    notes: typeof row.notes === "string" ? row.notes : typeof row.note === "string" ? row.note : undefined,
+    notes:
+      typeof row.notes === "string"
+        ? row.notes
+        : typeof row.note === "string"
+          ? row.note
+          : typeof row.requestNote === "string"
+            ? row.requestNote
+            : undefined,
   };
 }
 
